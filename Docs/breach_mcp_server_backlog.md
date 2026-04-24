@@ -404,9 +404,14 @@ Confirmed weak areas:
 - Current slice:
   - `validate_template` implemented for mission template intake/schema checks
   - `compile_payload` implemented for `mission_payload.generated.json` and `mission_compile_report.json`
+  - `generate_layout` implemented for deterministic `mission_layout.generated.json` with `LayoutGraph`, `RoomGraph`, `PortalGraph`, `CoverGraph`, `VisibilityGraph`, and `HearingGraph`
+  - `layoutRevisionId` is stable for identical template inputs and is stamped into the payload header when a payload exists
+  - `place_entities` now fails with `ORDER_VIOLATION_NO_LAYOUT_GRAPH` until a current layout exists
+  - `place_entities` writes deterministic `mission_entities.generated.json` actor/objective placement after validating the current `layoutRevisionId`
+  - generated placement entities carry stable ownership metadata plus `roomId`, `navNodeId`, and `layoutRevisionId`
   - bridge responses preserve the shared mission result envelope with `status`, `artifacts`, and `findings`
   - template validation findings stay on the `TPL_*` code family
-  - layout, placement, verification, retry, and manifest writing remain pending
+  - verification, retry execution, and manifest writing remain pending
 
 ## Recommended Delivery Waves
 

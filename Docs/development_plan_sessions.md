@@ -16,12 +16,15 @@ Completed:
 - `validate_template` works for `VS01_HostageApartment`
 - `compile_payload` works for `VS01_HostageApartment`
 - `mission_payload.generated.json` and `mission_compile_report.json` are generated
+- `generate_layout` writes deterministic layout/tactical graph output
+- `layoutRevisionId` is stable for identical layout inputs
+- `place_entities` remains blocked by `ORDER_VIOLATION_NO_LAYOUT_GRAPH` until layout exists
+- `place_entities` writes deterministic actor/objective placement after current layout validation
+- generated placement entities carry stable ownership metadata, `roomId`, `navNodeId`, and `layoutRevisionId`
 - Unity editor compilation was verified against the embedded package
 
 Pending:
 
-- `generate_layout`
-- `place_entities`
 - `verify`
 - `write_manifest`
 - retry policy
@@ -106,6 +109,10 @@ Recommended handoff note:
 Goal:
 
 - implement `manage_mission(action="place_entities")`
+
+Status:
+
+- completed
 
 Work:
 
@@ -222,4 +229,3 @@ Before switching chats:
 - [Docs/generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md)
 - [Docs/breach_mcp_server_backlog.md](breach_mcp_server_backlog.md)
 - [Docs/runtime_tools.md](runtime_tools.md)
-

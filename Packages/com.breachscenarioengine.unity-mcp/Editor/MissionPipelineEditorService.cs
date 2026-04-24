@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -28,8 +30,8 @@ namespace BreachScenarioEngine.Mcp.Editor
             {
                 "validate_template" => ValidateTemplate(raw),
                 "compile_payload" => CompilePayload(raw),
-                "generate_layout" => NotImplemented(action),
-                "place_entities" => NotImplemented(action),
+                "generate_layout" => GenerateLayout(raw),
+                "place_entities" => PlaceEntities(raw),
                 "verify" => NotImplemented(action),
                 "write_manifest" => NotImplemented(action),
                 _ => (false, MissionResultJson("FAIL", "", Array.Empty<string>(), new[]
@@ -94,6 +96,129 @@ namespace BreachScenarioEngine.Mcp.Editor
 
             var artifacts = new[] { ToRepoPath(payloadPath), ToRepoPath(reportPath) };
             return (true, MissionResultJson("PASS", template.MissionId, artifacts, findings));
+        }
+
+        private static (bool Success, string Message) GenerateLayout(string raw)
+        {
+            var context = ResolveContext(raw);
+            if (!context.Success)
+            {
+                return (false, context.Error!);
+            }
+
+            if (!MissionTemplateModel.TryLoad(context.TemplatePath!, context.MissionId, out var template, out var findings))
+            {
+                return (false, MissionResultJson("FAIL", context.MissionId ?? template?.MissionId ?? "", new[] { ToRepoPath(context.TemplatePath!) }, findings));
+            }
+
+            var missionDir = Path.GetDirectoryName(context.TemplatePath!)!;
+            var layoutPath = ResolveMissionArtifactPath(raw, "layoutPath", missionDir, "mission_layout.generated.json");
+            if (!IsUnderProjectRoot(layoutPath))
+            {
+                return (false, MissionResultJson("FAIL", template!.MissionId, new[] { ToRepoPath(context.TemplatePath!) }, new[]
+                {
+                    Finding("error", "LAYOUT_PATH_OUTSIDE_PROJECT", "layoutPath must stay inside the Unity project root")
+                }));
+            }
+
+            Directory.CreateDirectory(missionDir);
+            Directory.CreateDirectory(Path.GetDirectoryName(layoutPath)!);
+
+            var layoutNode = BuildLayoutNode(template!);
+            var payloadPath = ResolveMissionArtifactPath(raw, "payloadPath", missionDir, "mission_payload.generated.json");
+            if (File.Exists(payloadPath) && IsUnderProjectRoot(payloadPath))
+            {
+                TryStampPayloadLayoutRevision(payloadPath, layoutNode["layoutRevisionId"]!.GetValue<string>());
+            }
+
+            File.WriteAllText(layoutPath, layoutNode.ToJsonString() + Environment.NewLine);
+            AssetDatabase.Refresh();
+
+            var artifacts = new List<string> { ToRepoPath(layoutPath) };
+            if (File.Exists(payloadPath) && IsUnderProjectRoot(payloadPath))
+            {
+                artifacts.Add(ToRepoPath(payloadPath));
+            }
+
+            return (true, MissionResultJson("PASS", template.MissionId, artifacts, findings));
+        }
+
+        private static (bool Success, string Message) PlaceEntities(string raw)
+        {
+            var context = ResolveContext(raw);
+            if (!context.Success)
+            {
+                return (false, context.Error!);
+            }
+
+            if (!MissionTemplateModel.TryLoad(context.TemplatePath!, context.MissionId, out var template, out var findings))
+            {
+                return (false, MissionResultJson("FAIL", context.MissionId ?? template?.MissionId ?? "", new[] { ToRepoPath(context.TemplatePath!) }, findings));
+            }
+
+            var missionDir = Path.GetDirectoryName(context.TemplatePath!)!;
+            var layoutPath = ResolveMissionArtifactPath(raw, "layoutPath", missionDir, "mission_layout.generated.json");
+            if (!IsUnderProjectRoot(layoutPath))
+            {
+                return (false, MissionResultJson("FAIL", template!.MissionId, new[] { ToRepoPath(context.TemplatePath!) }, new[]
+                {
+                    Finding("error", "LAYOUT_PATH_OUTSIDE_PROJECT", "layoutPath must stay inside the Unity project root")
+                }));
+            }
+
+            if (!File.Exists(layoutPath))
+            {
+                findings.Add(Finding("error", "ORDER_VIOLATION_NO_LAYOUT_GRAPH", "place_entities requires a current LayoutGraph from generate_layout"));
+                return (false, MissionResultJson("FAIL", template!.MissionId, new[] { ToRepoPath(layoutPath) }, findings));
+            }
+
+            JsonObject? layoutNode;
+            try
+            {
+                layoutNode = JsonNode.Parse(File.ReadAllText(layoutPath)) as JsonObject;
+            }
+            catch
+            {
+                layoutNode = null;
+            }
+
+            var expectedRevisionId = ComputeLayoutRevisionId(template!);
+            var layoutRevisionId = layoutNode?["layoutRevisionId"]?.GetValue<string>() ?? "";
+            var layoutMissionId = layoutNode?["missionId"]?.GetValue<string>() ?? "";
+            if (layoutNode == null || layoutNode["LayoutGraph"] is not JsonObject || layoutNode["RoomGraph"] is not JsonObject)
+            {
+                findings.Add(Finding("error", "ORDER_VIOLATION_NO_LAYOUT_GRAPH", "place_entities requires a readable LayoutGraph and RoomGraph from generate_layout"));
+                return (false, MissionResultJson("FAIL", template.MissionId, new[] { ToRepoPath(layoutPath) }, findings));
+            }
+
+            if (!string.Equals(layoutMissionId, template.MissionId, StringComparison.Ordinal) ||
+                !string.Equals(layoutRevisionId, expectedRevisionId, StringComparison.Ordinal))
+            {
+                findings.Add(Finding("error", "ORDER_VIOLATION_STALE_LAYOUT_GRAPH", "place_entities requires the current layoutRevisionId from generate_layout"));
+                return (false, MissionResultJson("FAIL", template.MissionId, new[] { ToRepoPath(layoutPath) }, findings));
+            }
+
+            if (LayoutRooms(layoutNode).Count == 0)
+            {
+                findings.Add(Finding("error", "ORDER_VIOLATION_NO_LAYOUT_GRAPH", "place_entities requires at least one room in RoomGraph"));
+                return (false, MissionResultJson("FAIL", template.MissionId, new[] { ToRepoPath(layoutPath) }, findings));
+            }
+
+            var entitiesPath = ResolveMissionArtifactPath(raw, "entitiesPath", missionDir, "mission_entities.generated.json");
+            if (!IsUnderProjectRoot(entitiesPath))
+            {
+                return (false, MissionResultJson("FAIL", template.MissionId, new[] { ToRepoPath(layoutPath) }, new[]
+                {
+                    Finding("error", "ENTITIES_PATH_OUTSIDE_PROJECT", "entitiesPath must stay inside the Unity project root")
+                }));
+            }
+
+            var placementNode = BuildEntityPlacementNode(template, layoutNode);
+            Directory.CreateDirectory(Path.GetDirectoryName(entitiesPath)!);
+            File.WriteAllText(entitiesPath, placementNode.ToJsonString() + Environment.NewLine);
+            AssetDatabase.Refresh();
+
+            return (true, MissionResultJson("PASS", template.MissionId, new[] { ToRepoPath(layoutPath), ToRepoPath(entitiesPath) }, findings));
         }
 
         private static (bool Success, string? MissionId, string? TemplatePath, string? Error) ResolveContext(string raw)
@@ -217,6 +342,375 @@ namespace BreachScenarioEngine.Mcp.Editor
             }
 
             return array;
+        }
+
+        private static JsonObject BuildLayoutNode(MissionTemplateModel template)
+        {
+            var revisionId = ComputeLayoutRevisionId(template);
+            var rooms = BuildRooms(template, revisionId);
+            var portals = BuildPortals(revisionId, rooms);
+            var coverPoints = BuildCoverPoints(revisionId, rooms);
+
+            return new JsonObject
+            {
+                ["schemaVersion"] = "bse.mission_layout.v2.2",
+                ["pipelineVersion"] = PipelineVersion,
+                ["missionId"] = template.MissionId,
+                ["layoutRevisionId"] = revisionId,
+                ["requestedSeed"] = template.InitialSeed,
+                ["retryPolicy"] = new JsonObject
+                {
+                    ["retryFromStep"] = 6,
+                    ["retryAction"] = "generate_layout",
+                    ["placementStep"] = 5
+                },
+                ["LayoutGraph"] = new JsonObject
+                {
+                    ["layoutRevisionId"] = revisionId,
+                    ["bounds"] = IntArrayNode(template.WorldBounds),
+                    ["theme"] = template.TacticalTheme,
+                    ["entryRoomId"] = "room_entry",
+                    ["objectiveRoomIds"] = new JsonArray(rooms.Select(r => r["id"]!.GetValue<string>()).Where(id => id.Contains("vault", StringComparison.Ordinal)).Select(id => (JsonNode?)id).ToArray())
+                },
+                ["RoomGraph"] = new JsonObject
+                {
+                    ["layoutRevisionId"] = revisionId,
+                    ["rooms"] = new JsonArray(rooms.Select(r => (JsonNode?)r.DeepClone()).ToArray())
+                },
+                ["PortalGraph"] = new JsonObject
+                {
+                    ["layoutRevisionId"] = revisionId,
+                    ["portals"] = new JsonArray(portals.Select(p => (JsonNode?)p).ToArray())
+                },
+                ["CoverGraph"] = new JsonObject
+                {
+                    ["layoutRevisionId"] = revisionId,
+                    ["coverPoints"] = new JsonArray(coverPoints.Select(c => (JsonNode?)c).ToArray())
+                },
+                ["VisibilityGraph"] = BuildVisibilityGraph(revisionId, rooms),
+                ["HearingGraph"] = BuildHearingGraph(template, revisionId, rooms)
+            };
+        }
+
+        private static List<JsonObject> BuildRooms(MissionTemplateModel template, string revisionId)
+        {
+            var width = template.WorldBounds[0];
+            var height = template.WorldBounds[1];
+            var corridor = Math.Max(1, template.CorridorWidth);
+            var halfW = Math.Max(template.MinRoomSize[0], width / 2);
+            var halfH = Math.Max(template.MinRoomSize[1], height / 2);
+
+            return new List<JsonObject>
+            {
+                Room("room_entry", revisionId, "entry", 0, 0, halfW - corridor, halfH - corridor),
+                Room("room_living", revisionId, "living_area", halfW + corridor, 0, width - halfW - corridor, halfH - corridor),
+                Room("room_hallway", revisionId, "hallway", 0, halfH + corridor, halfW - corridor, height - halfH - corridor),
+                Room("room_vault", revisionId, "security_vault", halfW + corridor, halfH + corridor, width - halfW - corridor, height - halfH - corridor)
+            };
+        }
+
+        private static JsonObject Room(string id, string revisionId, string tag, int x, int y, int width, int height)
+        {
+            width = Math.Max(1, width);
+            height = Math.Max(1, height);
+            return new JsonObject
+            {
+                ["id"] = id,
+                ["layoutRevisionId"] = revisionId,
+                ["tag"] = tag,
+                ["rect"] = new JsonObject
+                {
+                    ["x"] = x,
+                    ["y"] = y,
+                    ["width"] = width,
+                    ["height"] = height
+                },
+                ["navNodeId"] = $"nav_{id.Substring("room_".Length)}"
+            };
+        }
+
+        private static List<JsonObject> BuildPortals(string revisionId, IReadOnlyList<JsonObject> rooms)
+        {
+            return new List<JsonObject>
+            {
+                Portal("portal_entry_living", revisionId, rooms[0], rooms[1]),
+                Portal("portal_entry_hallway", revisionId, rooms[0], rooms[2]),
+                Portal("portal_hallway_vault", revisionId, rooms[2], rooms[3]),
+                Portal("portal_living_vault", revisionId, rooms[1], rooms[3])
+            };
+        }
+
+        private static JsonObject Portal(string id, string revisionId, JsonObject a, JsonObject b)
+        {
+            return new JsonObject
+            {
+                ["id"] = id,
+                ["layoutRevisionId"] = revisionId,
+                ["fromRoomId"] = a["id"]!.GetValue<string>(),
+                ["toRoomId"] = b["id"]!.GetValue<string>(),
+                ["kind"] = "door",
+                ["width"] = 1
+            };
+        }
+
+        private static List<JsonObject> BuildCoverPoints(string revisionId, IReadOnlyList<JsonObject> rooms)
+        {
+            return rooms.Select((room, index) => new JsonObject
+            {
+                ["id"] = $"cover_{index + 1:00}",
+                ["layoutRevisionId"] = revisionId,
+                ["roomId"] = room["id"]!.GetValue<string>(),
+                ["navNodeId"] = room["navNodeId"]!.GetValue<string>(),
+                ["quality"] = index == 0 ? "low" : "medium"
+            }).ToList();
+        }
+
+        private static JsonObject BuildVisibilityGraph(string revisionId, IReadOnlyList<JsonObject> rooms)
+        {
+            return new JsonObject
+            {
+                ["layoutRevisionId"] = revisionId,
+                ["edges"] = new JsonArray
+                {
+                    VisibilityEdge(revisionId, rooms[0], rooms[1], 0.7),
+                    VisibilityEdge(revisionId, rooms[0], rooms[2], 0.6),
+                    VisibilityEdge(revisionId, rooms[2], rooms[3], 0.45),
+                    VisibilityEdge(revisionId, rooms[1], rooms[3], 0.35)
+                }
+            };
+        }
+
+        private static JsonObject VisibilityEdge(string revisionId, JsonObject a, JsonObject b, double openness)
+        {
+            return new JsonObject
+            {
+                ["layoutRevisionId"] = revisionId,
+                ["fromRoomId"] = a["id"]!.GetValue<string>(),
+                ["toRoomId"] = b["id"]!.GetValue<string>(),
+                ["openness"] = openness
+            };
+        }
+
+        private static JsonObject BuildHearingGraph(MissionTemplateModel template, string revisionId, IReadOnlyList<JsonObject> rooms)
+        {
+            return new JsonObject
+            {
+                ["layoutRevisionId"] = revisionId,
+                ["wallMultiplier"] = template.WallMultiplier,
+                ["doorPenalty"] = template.DoorPenalty,
+                ["edges"] = new JsonArray
+                {
+                    HearingEdge(revisionId, rooms[0], rooms[1], template.DoorPenalty),
+                    HearingEdge(revisionId, rooms[0], rooms[2], template.DoorPenalty),
+                    HearingEdge(revisionId, rooms[2], rooms[3], template.DoorPenalty),
+                    HearingEdge(revisionId, rooms[1], rooms[3], template.WallMultiplier)
+                }
+            };
+        }
+
+        private static JsonObject HearingEdge(string revisionId, JsonObject a, JsonObject b, double attenuation)
+        {
+            return new JsonObject
+            {
+                ["layoutRevisionId"] = revisionId,
+                ["fromRoomId"] = a["id"]!.GetValue<string>(),
+                ["toRoomId"] = b["id"]!.GetValue<string>(),
+                ["attenuation"] = attenuation
+            };
+        }
+
+        private static JsonObject BuildEntityPlacementNode(MissionTemplateModel template, JsonObject layoutNode)
+        {
+            var revisionId = layoutNode["layoutRevisionId"]!.GetValue<string>();
+            var rooms = LayoutRooms(layoutNode);
+            var actors = new JsonArray();
+            var objectives = new JsonArray();
+
+            foreach (var actor in template.Actors)
+            {
+                for (var i = 0; i < actor.NormalizedCount; i++)
+                {
+                    var room = RoomForActor(actor, rooms, layoutNode, i);
+                    var entityId = $"{actor.Id}_{i + 1:00}";
+                    actors.Add(new JsonObject
+                    {
+                        ["entityId"] = entityId,
+                        ["kind"] = "actor",
+                        ["sourceActorId"] = actor.Id,
+                        ["type"] = actor.Type,
+                        ["navigationPolicy"] = actor.NavigationPolicy,
+                        ["placementPolicy"] = actor.PlacementPolicy,
+                        ["roomId"] = room["id"]!.GetValue<string>(),
+                        ["navNodeId"] = room["navNodeId"]!.GetValue<string>(),
+                        ["layoutRevisionId"] = revisionId,
+                        ["ownership"] = OwnershipNode(template.MissionId, revisionId, entityId, actor.Id)
+                    });
+                }
+            }
+
+            foreach (var objective in template.PrimaryObjectives)
+            {
+                objectives.Add(ObjectivePlacementNode(template, revisionId, rooms, layoutNode, objective, "primary"));
+            }
+
+            foreach (var objective in template.SecondaryObjectives)
+            {
+                objectives.Add(ObjectivePlacementNode(template, revisionId, rooms, layoutNode, objective, "secondary"));
+            }
+
+            return new JsonObject
+            {
+                ["schemaVersion"] = "bse.mission_entities.v2.2",
+                ["pipelineVersion"] = PipelineVersion,
+                ["missionId"] = template.MissionId,
+                ["layoutRevisionId"] = revisionId,
+                ["placementStep"] = 5,
+                ["requiresLayoutStep"] = 6,
+                ["actors"] = actors,
+                ["objectives"] = objectives
+            };
+        }
+
+        private static JsonObject ObjectivePlacementNode(
+            MissionTemplateModel template,
+            string revisionId,
+            IReadOnlyList<JsonObject> rooms,
+            JsonObject layoutNode,
+            MissionObjective objective,
+            string objectiveSet)
+        {
+            var room = RoomForObjective(objective, rooms, layoutNode);
+            return new JsonObject
+            {
+                ["entityId"] = objective.Id,
+                ["kind"] = "objective",
+                ["objectiveSet"] = objectiveSet,
+                ["type"] = objective.Type,
+                ["requiresLayoutGraph"] = objective.RequiresLayoutGraph ?? false,
+                ["targetRoomTag"] = objective.TargetRoomTag,
+                ["optional"] = objective.Optional ?? false,
+                ["roomId"] = room["id"]!.GetValue<string>(),
+                ["navNodeId"] = room["navNodeId"]!.GetValue<string>(),
+                ["layoutRevisionId"] = revisionId,
+                ["ownership"] = OwnershipNode(template.MissionId, revisionId, objective.Id, objective.Id)
+            };
+        }
+
+        private static JsonObject OwnershipNode(string missionId, string layoutRevisionId, string entityId, string sourceId)
+        {
+            return new JsonObject
+            {
+                ["owner"] = "bse-pipeline",
+                ["generatedBy"] = "manage_mission.place_entities",
+                ["missionId"] = missionId,
+                ["sourceId"] = sourceId,
+                ["entityId"] = entityId,
+                ["layoutRevisionId"] = layoutRevisionId,
+                ["stableKey"] = $"{missionId}:{layoutRevisionId}:{entityId}"
+            };
+        }
+
+        private static JsonObject RoomForActor(MissionActor actor, IReadOnlyList<JsonObject> rooms, JsonObject layoutNode, int index)
+        {
+            return actor.PlacementPolicy switch
+            {
+                "EntryPointOnly" => EntryRoom(rooms, layoutNode),
+                "PostLayout_TaggedRoom" => FirstObjectiveRoom(rooms, layoutNode),
+                "PostLayout_AnyRoom" => rooms.Count == 0 ? EntryRoom(rooms, layoutNode) : rooms[(index + 1) % rooms.Count],
+                "SecureRoomOnly" => RoomByTag(rooms, "security_vault") ?? FirstObjectiveRoom(rooms, layoutNode),
+                _ => EntryRoom(rooms, layoutNode)
+            };
+        }
+
+        private static JsonObject RoomForObjective(MissionObjective objective, IReadOnlyList<JsonObject> rooms, JsonObject layoutNode)
+        {
+            if (!string.IsNullOrWhiteSpace(objective.TargetRoomTag))
+            {
+                var tagged = RoomByTag(rooms, objective.TargetRoomTag);
+                if (tagged != null)
+                {
+                    return tagged;
+                }
+            }
+
+            return objective.RequiresLayoutGraph == true ? FirstObjectiveRoom(rooms, layoutNode) : EntryRoom(rooms, layoutNode);
+        }
+
+        private static List<JsonObject> LayoutRooms(JsonObject layoutNode)
+        {
+            var roomArray = layoutNode["RoomGraph"]?["rooms"] as JsonArray;
+            if (roomArray == null)
+            {
+                return new List<JsonObject>();
+            }
+
+            return roomArray.OfType<JsonObject>().Select(room => (JsonObject)room.DeepClone()).ToList();
+        }
+
+        private static JsonObject EntryRoom(IReadOnlyList<JsonObject> rooms, JsonObject layoutNode)
+        {
+            var entryRoomId = layoutNode["LayoutGraph"]?["entryRoomId"]?.GetValue<string>() ?? "room_entry";
+            return RoomById(rooms, entryRoomId) ?? rooms.First();
+        }
+
+        private static JsonObject FirstObjectiveRoom(IReadOnlyList<JsonObject> rooms, JsonObject layoutNode)
+        {
+            var objectiveIds = layoutNode["LayoutGraph"]?["objectiveRoomIds"] as JsonArray;
+            var firstId = objectiveIds?.OfType<JsonValue>().Select(v => v.GetValue<string>()).FirstOrDefault(id => !string.IsNullOrWhiteSpace(id));
+            return !string.IsNullOrWhiteSpace(firstId) ? RoomById(rooms, firstId!) ?? EntryRoom(rooms, layoutNode) : EntryRoom(rooms, layoutNode);
+        }
+
+        private static JsonObject? RoomById(IReadOnlyList<JsonObject> rooms, string id)
+        {
+            return rooms.FirstOrDefault(room => string.Equals(room["id"]?.GetValue<string>(), id, StringComparison.Ordinal));
+        }
+
+        private static JsonObject? RoomByTag(IReadOnlyList<JsonObject> rooms, string tag)
+        {
+            return rooms.FirstOrDefault(room => string.Equals(room["tag"]?.GetValue<string>(), tag, StringComparison.Ordinal));
+        }
+
+        private static string ComputeLayoutRevisionId(MissionTemplateModel template)
+        {
+            var source = new JsonObject
+            {
+                ["pipelineVersion"] = PipelineVersion,
+                ["missionId"] = template.MissionId,
+                ["requestedSeed"] = template.InitialSeed,
+                ["bounds"] = IntArrayNode(template.WorldBounds),
+                ["theme"] = template.TacticalTheme,
+                ["ppu"] = template.PixelsPerUnit,
+                ["bsp"] = new JsonObject
+                {
+                    ["minRoomSize"] = IntArrayNode(template.MinRoomSize),
+                    ["maxRoomSize"] = IntArrayNode(template.MaxRoomSize),
+                    ["corridorWidth"] = template.CorridorWidth,
+                    ["forceAdjacency"] = template.ForceRoomAdjacency
+                },
+                ["primaryObjectives"] = new JsonArray(template.PrimaryObjectives.Select(ObjectiveNode).ToArray())
+            };
+
+            using var sha = SHA256.Create();
+            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(source.ToJsonString()));
+            return "layout_" + BitConverter.ToString(bytes, 0, 4).Replace("-", string.Empty).ToLowerInvariant();
+        }
+
+        private static void TryStampPayloadLayoutRevision(string payloadPath, string layoutRevisionId)
+        {
+            try
+            {
+                var node = JsonNode.Parse(File.ReadAllText(payloadPath)) as JsonObject;
+                if (node?["header"] is not JsonObject header)
+                {
+                    return;
+                }
+
+                header["layoutRevisionId"] = layoutRevisionId;
+                File.WriteAllText(payloadPath, node.ToJsonString() + Environment.NewLine);
+            }
+            catch
+            {
+            }
         }
 
         private static List<JsonObject> ValidatePayloadShape(JsonObject payload)
