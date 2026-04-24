@@ -3,6 +3,9 @@
 <INSTRUCTIONS>
 Используй PowerShell (нет rg).
 
+Unity находится здесь:
+`C:\Program Files\Unity\Hub\Editor\6000.4.3f1\Editor\Unity.exe`
+
 План разработки хранится в:
 `Docs/development_plan_sessions.md`
 
