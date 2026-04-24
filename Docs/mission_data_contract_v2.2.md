@@ -105,6 +105,14 @@ When Unity 6 parses this payload:
 - `initialSeed` is the generator input seed.
 - `effectiveSeed` is the resolved seed after a successful pass.
 - Replay mode must use `effectiveSeed` if it is greater than zero.
+- Final seed ownership lives in `GenerationManifest`; the payload reflects the
+  verified result after PASS, not an unvalidated template claim.
+
+### Naming alignment
+
+- New mission payloads should use the `VS##_ShortMissionName` convention.
+- Legacy `TBM_####_*` identifiers are allowed only for migration of archived
+  content.
 
 ### Version alignment
 
@@ -116,4 +124,3 @@ template and architecture documents in this repository.
 - Missing members are treated as errors.
 - Unknown payload fields are treated as errors.
 - Theme lookup failure must stop layout generation before geometry work starts.
-

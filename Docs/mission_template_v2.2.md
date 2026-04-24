@@ -12,13 +12,21 @@ design templates in `UserMissionSources/`.
 The generated payload emitted from this template must satisfy
 [mission_data_contract_v2.2.md](mission_data_contract_v2.2.md).
 
+User-facing authoring remains a single template file. Codex and the compiler
+may split it into internal sections, but the designer should not be asked to
+edit multiple small files for a normal mission.
+
+Canonical mission IDs use the `VS##_ShortMissionName` convention. Legacy
+`TBM_####_*` names are migration-only and should not be introduced in new
+content.
+
 ## 1. Generation Meta
 
 Controls the procedural generation lifecycle.
 
 ```yaml
 schemaVersion: "tb.mission_template.v2.2"
-missionId: "MSN-XXXX"
+missionId: "VS01_HostageApartment"
 generationMeta:
   initialSeed: 0
   effectiveSeed: 0
@@ -114,3 +122,10 @@ Any of the following conditions must stop generation or trigger a seed retry.
 ## 7. Migration Guide
 
 Use `tb.mission_template.v2.2` as the active schema version.
+
+When migrating legacy content:
+
+1. Keep the user-facing template single-file.
+2. Move internal split sections into compiler artifacts only.
+3. Rename mission identifiers to the `VS##_ShortMissionName` convention.
+4. Keep `TBM_####_*` references only in migration notes or archived content.
