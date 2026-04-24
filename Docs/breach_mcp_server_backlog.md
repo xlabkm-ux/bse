@@ -390,6 +390,18 @@ Confirmed weak areas:
 - Dependencies:
   - build profile switching
 
+### BSE-022 - Mission pipeline MCP surface
+
+- Priority: `P0`
+- Complexity: `L`
+- Status: planned
+- Goal: implement `manage_mission(...)` actions from `mission_pipeline_contract_v2.2.md`
+- Why: the first project feature needs a dedicated mission pipeline surface instead of hiding generation behind generic asset tools
+- Dependencies:
+  - mission authoring contract
+  - payload contract
+  - generation manifest contract
+
 ## Recommended Delivery Waves
 
 ### Wave 1 - Unblock autonomous verification
@@ -400,10 +412,11 @@ Confirmed weak areas:
 - `BSE-004`
 - `BSE-005`
 - `BSE-006`
+- `BSE-022`
 
 Outcome:
 
-- Codex can reliably preflight, enter Play Mode, validate scene/prefab refs, run tests, and drive gameplay scenarios.
+- Codex can reliably preflight, enter Play Mode, validate scene/prefab refs, run tests, drive gameplay scenarios, and invoke the mission pipeline entry points.
 
 ### Wave 2 - Close verification end-to-end
 

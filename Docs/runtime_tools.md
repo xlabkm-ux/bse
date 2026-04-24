@@ -42,3 +42,4 @@ The inventory is target-only.
 - The runtime no longer advertises legacy bridge command names in `tools/list`.
 - The target names above are the ones to use in new workflows and docs.
 - `manage_editor` now covers editor status/play mode plus Unity MCP package lifecycle actions: `install`, `update`, and `delete`.
+- `manage_mission` is a target mission-pipeline tool family documented in `mission_pipeline_contract_v2.2.md`; it is not part of the current runtime inventory yet.

@@ -1,5 +1,5 @@
 schemaVersion: "tb.mission_template.v2.2"
-missionId: "TBM_0001_HostageApartment"
+missionId: "VS01_HostageApartment"
 missionTitle: "Hostage Apartment"
 
 generationMeta:

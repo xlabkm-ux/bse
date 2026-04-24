@@ -92,3 +92,12 @@ Validation and policy checks:
 - `manage_localization(action="validate_fallback_language")`
 - `manage_graphics(action="validate_profile_assignment")`
 - `manage_asset(action="classify_risk")`
+
+Mission pipeline target surface:
+
+- `manage_mission(action="validate_template")`
+- `manage_mission(action="compile_payload")`
+- `manage_mission(action="generate_layout")`
+- `manage_mission(action="place_entities")`
+- `manage_mission(action="verify")`
+- `manage_mission(action="write_manifest")`

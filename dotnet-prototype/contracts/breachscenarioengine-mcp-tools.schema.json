@@ -265,6 +265,27 @@
       },
       "additionalProperties": true
     },
+    "manage_mission": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "validate_template",
+            "compile_payload",
+            "generate_layout",
+            "place_entities",
+            "verify",
+            "write_manifest"
+          ]
+        },
+        "missionId": { "type": "string" },
+        "templatePath": { "type": "string" },
+        "payloadPath": { "type": "string" },
+        "manifestPath": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
     "run_tests": {
       "type": "object",
       "properties": {

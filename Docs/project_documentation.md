@@ -24,13 +24,25 @@ and server-side workflow are supposed to be used.
   - Canonical mission template specification
   - Source of truth for mission authoring and validation
 
+- [Docs/mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md)
+  - Authoring ownership contract
+  - Separates user-authored YAML from compiler, profile, and manifest fields
+
 - [Docs/breach_mcp_architecture_v2.2.md](breach_mcp_architecture_v2.2.md)
   - Technical architecture specification
   - Defines layout-first orchestration, occlusion math, and retry policy
 
+- [Docs/mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md)
+  - Step 0-7 implementation contract
+  - Defines artifacts, retry rules, and target mission MCP actions
+
 - [Docs/mission_data_contract_v2.2.md](mission_data_contract_v2.2.md)
   - JSON Schema payload contract
   - Defines the final runtime data shape for Unity DTO parsing
+
+- [Docs/generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md)
+  - Replay and verification manifest contract
+  - Owns `effectiveSeed`, `retrySeeds`, `layoutRevisionId`, and artifact paths
 
 - [mcp/README.md](../mcp/README.md)
   - Index of MCP contracts, prompts, policies, resources, and validators
@@ -77,10 +89,14 @@ and server-side workflow are supposed to be used.
 2. [Docs/README.md](README.md)
 3. [Docs/canonical_tools.md](canonical_tools.md)
 4. [Docs/runtime_tools.md](runtime_tools.md)
-5. [Docs/breach_mcp_verification_contract.md](breach_mcp_verification_contract.md)
-6. [Docs/breach_mcp_server_backlog.md](breach_mcp_server_backlog.md)
-7. [mcp/README.md](../mcp/README.md)
-8. [Docs/Archive/README.md](Archive/README.md)
+5. [Docs/mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md)
+6. [Docs/mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md)
+7. [Docs/mission_data_contract_v2.2.md](mission_data_contract_v2.2.md)
+8. [Docs/generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md)
+9. [Docs/breach_mcp_verification_contract.md](breach_mcp_verification_contract.md)
+10. [Docs/breach_mcp_server_backlog.md](breach_mcp_server_backlog.md)
+11. [mcp/README.md](../mcp/README.md)
+12. [Docs/Archive/README.md](Archive/README.md)
 
 ## 3. Runtime Snapshot
 
@@ -183,13 +199,17 @@ Purpose:
 - `mcp/resources/*`
 - `mcp/validators/*`
 - `Docs/breach_mcp_architecture_v2.2.md`
+- `Docs/mission_authoring_contract_v2.2.md`
+- `Docs/mission_pipeline_contract_v2.2.md`
 - `Docs/mission_template_v2.2.md`
 - `Docs/mission_data_contract_v2.2.md`
+- `Docs/generation_manifest_contract_v2.2.md`
 
 Purpose:
 - capture reusable recipes, guardrails, and release checks
 - define the current pipeline and mission template contracts
 - define the payload contract consumed by Unity
+- define the manifest contract used for deterministic replay
 
 ### E. History
 
@@ -200,7 +220,7 @@ Purpose:
 
 ## 6. Status of MCP Server Work
 
-The server backlog is complete:
+The imported MCP bridge/server baseline is complete:
 
 - `BSE-001` to `BSE-021` are marked `completed`
 - the active runtime inventory is target-only
@@ -208,6 +228,10 @@ The server backlog is complete:
   indexing, localization validation, build, profiler, save, schema
   validation, quality-profile validation, change-risk workflows, and
   server-side Unity MCP package lifecycle management
+
+Mission pipeline implementation is not complete yet. The target surface is
+documented in [mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md)
+as `manage_mission(...)`.
 
 ## 7. Maintenance Rules
 

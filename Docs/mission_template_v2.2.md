@@ -12,17 +12,24 @@ design templates in `UserMissionSources/`.
 The generated payload emitted from this template must satisfy
 [mission_data_contract_v2.2.md](mission_data_contract_v2.2.md).
 
+Authoring ownership is defined in
+[mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md).
+Pipeline outputs are defined in
+[mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md) and
+[generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md).
+
 User-facing authoring remains a single template file. Codex and the compiler
 may split it into internal sections, but the designer should not be asked to
 edit multiple small files for a normal mission.
 
-Canonical mission IDs use the `VS##_ShortMissionName` convention. Legacy
-`TBM_####_*` names are migration-only and should not be introduced in new
-content.
+Canonical mission IDs use the `VS##_ShortMissionName` convention.
 
 ## 1. Generation Meta
 
 Controls the procedural generation lifecycle.
+
+`initialSeed` is authored. `effectiveSeed` is written by the pipeline after
+verification and must remain `0` in ungenerated templates.
 
 ```yaml
 schemaVersion: "tb.mission_template.v2.2"
@@ -119,13 +126,17 @@ Any of the following conditions must stop generation or trigger a seed retry.
 - `TB-PLC-002`: ordering violation
 - `TB-DTR-001`: determinism error
 
-## 7. Migration Guide
+## 7. Profile and Manifest Ownership
 
-Use `tb.mission_template.v2.2` as the active schema version.
+Reusable tuning lives in profile assets, not in the authoring template.
 
-When migrating legacy content:
+Global profile defaults:
 
-1. Keep the user-facing template single-file.
-2. Move internal split sections into compiler artifacts only.
-3. Rename mission identifiers to the `VS##_ShortMissionName` convention.
-4. Keep `TBM_####_*` references only in migration notes or archived content.
+`Assets/Data/Mission/Profiles/`
+
+Per-mission overrides:
+
+`Assets/Data/Mission/MissionConfig/<missionId>/Profiles/`
+
+The pipeline owns `generation_manifest.json`, `retrySeeds`, and
+`layoutRevisionId`.

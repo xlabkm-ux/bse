@@ -17,8 +17,11 @@ project version.
 Any document that describes mission generation must not contradict:
 
 - this architecture specification
+- [mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md)
+- [mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md)
 - [mission_template_v2.2.md](mission_template_v2.2.md)
 - [mission_data_contract_v2.2.md](mission_data_contract_v2.2.md)
+- [generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md)
 
 Legacy notes remain valid only when they do not conflict with this document.
 
@@ -28,7 +31,10 @@ Legacy notes remain valid only when they do not conflict with this document.
 |---|---:|---|---|
 | MissionArchitecture_Canonical | v2.2 | Active | Primary reference |
 | Mission Template | v2.2 | Active | Use canonical order and template split rule |
+| Mission Authoring Contract | v2.2 | Active | Template ownership and profile split |
+| Mission Pipeline Contract | v2.2 | Active | Step 0-7 implementation contract |
 | Mission Data Contract | v2.2 | Active | Final payload contract for Unity DTO parsing |
+| Generation Manifest Contract | v2.2 | Active | Replay and verification ownership |
 | MCP Resource Pipeline | v2.2 | Active | Must use Step 6 -> Step 5 -> Step 7 |
 | Legacy v1.4 docs | v1.4 | Deprecated | Migrate to current v2.2 contract |
 
@@ -79,11 +85,11 @@ replay authority until the pipeline passes verification.
 
 | Field | Owner | Before PASS | After PASS | Mutable? |
 |---|---|---:|---:|---|
-| `template.seed` | User Template | required | preserved | no, unless user edits template |
-| `generationMeta.requestedSeed` | Payload Compiler | copied from template | preserved | no |
+| `generationMeta.initialSeed` | User Template | required | preserved | no, unless user edits template |
+| `requestedSeed` | Payload Compiler | copied from `initialSeed` | preserved | no |
 | `generationMeta.effectiveSeed` | GenerationManifest | `0` or `null` | final replay seed | no after PASS |
-| `generationMeta.retrySeeds[]` | GenerationManifest | empty | attempted seeds in order | append-only |
-| `generationMeta.layoutRevisionId` | Step 6 | absent | hash/revision of accepted LayoutGraph | immutable after PASS |
+| `retrySeeds[]` | GenerationManifest | empty | attempted seeds in order | append-only |
+| `layoutRevisionId` | Step 6 | absent | hash/revision of accepted LayoutGraph | immutable after PASS |
 
 ### Rules
 
@@ -93,7 +99,7 @@ replay authority until the pipeline passes verification.
 3. If retry is required, retries must derive from `requestedSeed` using a
    deterministic policy:
    `retrySeed = Hash32(requestedSeed, missionId, retryIndex, pipelineVersion)`.
-4. Replay must use `effectiveSeed`, not `template.seed`, when
+4. Replay must use `effectiveSeed`, not `generationMeta.initialSeed`, when
    `GenerationManifest.status == PASS`.
 5. Any divergence between `effectiveSeed`, `layoutRevisionId`, and scene
    generated markers is blocking.
@@ -260,9 +266,16 @@ Blocking error codes:
 
 ## 8. Profile Assets and Validation
 
-All reusable generation limits must live in ScriptableObject profiles under:
+Reusable generation limits are loaded from global defaults first:
 
 `Assets/Data/Mission/Profiles/`
+
+Per-mission overrides may live under:
+
+`Assets/Data/Mission/MissionConfig/<missionId>/Profiles/`
+
+When an override exists, it must use the same profile interface and compatible
+`assetVersion`.
 
 Required profiles:
 
@@ -334,11 +347,8 @@ Examples:
 - `VS02_OfficeRaid`
 - `VS03_WarehouseBreach`
 
-Legacy `TBM_####_*` IDs are deprecated and may only appear in migration notes.
+Generated payload files must reference the same canonical mission id:
 
-### Migration Rule
-
-- `TBM_0001_HostageApartment` -> `VS01_HostageApartment`
 - `VS01_generation_payload.json` must reference
   `missionId: VS01_HostageApartment`
 - Generated scene root: `Generated/VS01_HostageApartment`
@@ -449,4 +459,3 @@ Split files are compiler artifacts or advanced overrides only.
   effectiveSeed, layoutRevisionId and verification result.
 - `McpGeneratedMarker`: component or metadata marker proving generated-object
   ownership and stable key identity.
-

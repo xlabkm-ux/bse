@@ -10,6 +10,8 @@ Short map of the main working areas in the Breach Scenario Engine repository.
 | [dotnet-prototype/contracts](../dotnet-prototype/contracts) | Tool contract schema |
 | [Docs/](.) | Active and project documentation |
 | [mcp/](../mcp) | Prompts, policies, resources, and validators |
+| [UserMissionSources/missions](../UserMissionSources/missions) | User-authored mission templates |
+| [Assets/Data/Mission/Profiles](../Assets/Data/Mission/Profiles) | Global mission profile defaults |
 
 ## Quick orientation
 
@@ -23,5 +25,7 @@ Short map of the main working areas in the Breach Scenario Engine repository.
 - Server behavior: `dotnet-prototype/src/BreachScenarioEngine.Mcp.Server`
 - Unity bridge behavior: `dotnet-prototype/unity/com.breachscenarioengine.unity-mcp`
 - Contract and schema updates: `dotnet-prototype/contracts`
+- Mission authoring inputs: `UserMissionSources/missions`
+- Mission profile defaults: `Assets/Data/Mission/Profiles`
 - Validation and runtime checks: `dotnet-prototype/tests`
 - Human-facing guidance: `Docs/` and `mcp/`
