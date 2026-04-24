@@ -7,6 +7,7 @@ Short entry point for the active Breach Scenario Engine MCP documentation.
 | [project_documentation.md](project_documentation.md) | Full map of the docs set and reading order |
 | [breach_mcp_architecture_v2.2.md](breach_mcp_architecture_v2.2.md) | Technical architecture specification for the layout-first pipeline |
 | [mission_template_v2.2.md](mission_template_v2.2.md) | Canonical mission template specification |
+| [mission_data_contract_v2.2.md](mission_data_contract_v2.2.md) | JSON Schema contract for generated mission payloads |
 | [canonical_tools.md](canonical_tools.md) | Target tool and resource contract |
 | [runtime_tools.md](runtime_tools.md) | Actual tools exposed by the current runtime |
 | [breach_mcp_verification_contract.md](breach_mcp_verification_contract.md) | Required verification payloads and resources |
@@ -19,5 +20,6 @@ Short entry point for the active Breach Scenario Engine MCP documentation.
 2. Check [runtime_tools.md](runtime_tools.md) against [canonical_tools.md](canonical_tools.md).
 3. Read [breach_mcp_architecture_v2.2.md](breach_mcp_architecture_v2.2.md) for pipeline orchestration and retry rules.
 4. Read [mission_template_v2.2.md](mission_template_v2.2.md) when authoring or validating mission templates.
-5. Use [breach_mcp_verification_contract.md](breach_mcp_verification_contract.md) when validating bridge behavior.
-6. Track remaining work in [breach_mcp_server_backlog.md](breach_mcp_server_backlog.md).
+5. Read [mission_data_contract_v2.2.md](mission_data_contract_v2.2.md) for payload validation and DTO rules.
+6. Use [breach_mcp_verification_contract.md](breach_mcp_verification_contract.md) when validating bridge behavior.
+7. Track remaining work in [breach_mcp_server_backlog.md](breach_mcp_server_backlog.md).

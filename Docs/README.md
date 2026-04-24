@@ -9,6 +9,7 @@ Server-side planning and verification docs for the Breach Scenario Engine MCP st
 - [project_documentation.md](project_documentation.md)
 - [breach_mcp_architecture_v2.2.md](breach_mcp_architecture_v2.2.md)
 - [mission_template_v2.2.md](mission_template_v2.2.md)
+- [mission_data_contract_v2.2.md](mission_data_contract_v2.2.md)
 - [canonical_tools.md](canonical_tools.md)
 - [runtime_tools.md](runtime_tools.md)
 - [breach_mcp_server_backlog.md](breach_mcp_server_backlog.md)

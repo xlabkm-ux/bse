@@ -9,6 +9,9 @@ This document captures the mission template contract used by the procedural
 mission pipeline. It is the reference for authoring and validating mission
 design templates in `UserMissionSources/`.
 
+The generated payload emitted from this template must satisfy
+[mission_data_contract_v2.2.md](mission_data_contract_v2.2.md).
+
 ## 1. Generation Meta
 
 Controls the procedural generation lifecycle.

@@ -17,7 +17,7 @@ Initial project scaffold for **TACTICAL BREACH: Mission Architect / Breach Scena
 ## Mission Workflow
 
 1. Fill a mission template in `UserMissionSources/missions/<missionId>/mission_design.template.yaml`
-2. Validate and compile it into `mission_payload.generated.json`
+2. Validate it against `Docs/mission_data_contract_v2.2.md` and compile it into `mission_payload.generated.json`
 3. Run the MCP / Unity generation pipeline
 4. Store deterministic outputs in the mission folder
 
@@ -26,6 +26,7 @@ Initial project scaffold for **TACTICAL BREACH: Mission Architect / Breach Scena
 - [Docs/README.md](Docs/README.md)
 - [Docs/index.md](Docs/index.md)
 - [Docs/breach_mcp_architecture_v2.2.md](Docs/breach_mcp_architecture_v2.2.md)
+- [Docs/mission_data_contract_v2.2.md](Docs/mission_data_contract_v2.2.md)
 
 ## Standards
 

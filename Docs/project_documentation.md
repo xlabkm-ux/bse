@@ -28,6 +28,10 @@ and server-side workflow are supposed to be used.
   - Technical architecture specification
   - Defines layout-first orchestration, occlusion math, and retry policy
 
+- [Docs/mission_data_contract_v2.2.md](mission_data_contract_v2.2.md)
+  - JSON Schema payload contract
+  - Defines the final runtime data shape for Unity DTO parsing
+
 - [mcp/README.md](../mcp/README.md)
   - Index of MCP contracts, prompts, policies, resources, and validators
 
@@ -181,10 +185,12 @@ Purpose:
 - `mcp/validators/*`
 - `Docs/breach_mcp_architecture_v2.2.md`
 - `Docs/mission_template_v2.2.md`
+- `Docs/mission_data_contract_v2.2.md`
 
 Purpose:
 - capture reusable recipes, guardrails, and release checks
 - define the current pipeline and mission template contracts
+- define the payload contract consumed by Unity
 
 ### E. History
 
