@@ -1,6 +1,6 @@
 # Scenario Macros
 
-Reusable verification recipes for xLabMcp.
+Reusable verification recipes for Breach Scenario Engine MCP.
 
 ## `scene_ref_sanity`
 

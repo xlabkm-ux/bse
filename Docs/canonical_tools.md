@@ -1,17 +1,17 @@
 # Canonical MCP Tools
 
-This document defines the target MCP resources and tools for xLabMcp.
+This document defines the target MCP resources and tools for the Breach Scenario Engine MCP stack.
 The current runtime inventory is documented separately in `runtime_tools.md`.
 
 ## Canonical resources
 
-- `xlabmcp://editor/state`
-- `xlabmcp://project/info`
-- `xlabmcp://scene/hierarchy`
-- `xlabmcp://scene/gameobject/{instanceId}`
-- `xlabmcp://tests/{mode}`
-- `xlabmcp://localization/tables`
-- `xlabmcp://quality/profiles`
+- `breachmcp://editor/state`
+- `breachmcp://project/info`
+- `breachmcp://scene/hierarchy`
+- `breachmcp://scene/gameobject/{instanceId}`
+- `breachmcp://tests/{mode}`
+- `breachmcp://localization/tables`
+- `breachmcp://quality/profiles`
 
 ## Canonical tools
 

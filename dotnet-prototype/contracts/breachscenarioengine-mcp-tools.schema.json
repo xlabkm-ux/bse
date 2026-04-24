@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "xLabMcp MCP Tool Contract",
+  "title": "Breach Scenario Engine MCP Tool Contract",
   "version": "0.5.0",
-  "description": "Target-only tool argument contract for the current xLabMcp runtime. Legacy step-based names have been removed.",
+  "description": "Target-only tool argument contract for the current Breach Scenario Engine MCP runtime. Legacy step-based names have been removed.",
   "tools": {
     "project_root.set": {
       "type": "object",

@@ -1,6 +1,6 @@
 ﻿{
-  "name": "XLab.UnityMcp.Editor",
-  "rootNamespace": "XLab.UnityMcp.Editor",
+  "name": "BreachScenarioEngine.Mcp.Editor",
+  "rootNamespace": "BreachScenarioEngine.Mcp.Editor",
   "references": [],
   "includePlatforms": [
     "Editor"

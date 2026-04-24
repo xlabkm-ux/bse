@@ -1,6 +1,6 @@
 # Build Smoke
 
-Lightweight build-smoke workflow for xLabMcp.
+Lightweight build-smoke workflow for Breach Scenario Engine MCP.
 
 ## Windows smoke
 

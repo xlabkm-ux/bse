@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Security.Cryptography;
@@ -1255,10 +1255,10 @@ namespace BreachScenarioEngine.Mcp.Editor
     private static (bool, string) ProjectCapabilities()
     {
         var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-        var packageJsonPath = Path.Combine(projectRoot, "Packages", "com.xlabkm.unity-mcp", "package.json");
+        var packageJsonPath = Path.Combine(projectRoot, "Packages", "com.breachscenarioengine.unity-mcp", "package.json");
         var packageJson = File.Exists(packageJsonPath) ? File.ReadAllText(packageJsonPath) : string.Empty;
         var packageVersion = JsonString(packageJson, "version") ?? "unknown";
-        var bridgeFile = Path.Combine(projectRoot, "Packages", "com.xlabkm.unity-mcp", "Editor", "McpBridgeProcessor.cs");
+        var bridgeFile = Path.Combine(projectRoot, "Packages", "com.breachscenarioengine.unity-mcp", "Editor", "McpBridgeProcessor.cs");
         var bridgeHashSource = packageJson;
         if (File.Exists(bridgeFile))
         {
@@ -1367,7 +1367,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             ["unityVersion"] = Application.unityVersion,
             ["bridgePackage"] = new JsonObject
             {
-                ["name"] = "com.xlabkm.unity-mcp",
+                ["name"] = "com.breachscenarioengine.unity-mcp",
                 ["version"] = packageVersion,
                 ["buildHash"] = Sha256Hex(bridgeHashSource)
             },
@@ -1968,7 +1968,7 @@ namespace BreachScenarioEngine.Mcp.Editor
 
     private static JsonObject BuildBridgeHealthReport(string projectRoot)
     {
-        var bridgeRoot = Path.Combine(projectRoot, "Library", "XLabMcpBridge");
+        var bridgeRoot = Path.Combine(projectRoot, "Library", "BreachMcpBridge");
         var commandsDir = Path.Combine(bridgeRoot, "commands");
         var responsesDir = Path.Combine(bridgeRoot, "responses");
         var heartbeatPath = Path.Combine(bridgeRoot, "heartbeat.json");
@@ -2071,8 +2071,8 @@ namespace BreachScenarioEngine.Mcp.Editor
             ["stuckCommands"] = stuckCommands,
             ["lastCommand"] = lastCommand,
             ["lastScreenshot"] = lastScreenshot,
-            ["screenshotIndexPath"] = "Library/XLabMcpBridge/screenshots/index.jsonl",
-            ["auditLogPath"] = "Library/XLabMcpBridge/audit.log",
+            ["screenshotIndexPath"] = "Library/BreachMcpBridge/screenshots/index.jsonl",
+            ["auditLogPath"] = "Library/BreachMcpBridge/audit.log",
             ["state"] = state,
             ["recommendedAction"] = recommendation,
             ["recommendedRetryAfterMs"] = heartbeatAgeMs is > 5000
@@ -2212,13 +2212,13 @@ namespace BreachScenarioEngine.Mcp.Editor
             ["scenario"] = scenario,
             ["step"] = step,
             ["label"] = label,
-            ["indexPath"] = "Library/XLabMcpBridge/screenshots/index.jsonl"
+            ["indexPath"] = "Library/BreachMcpBridge/screenshots/index.jsonl"
         }.ToJsonString());
     }
 
     private static void RecordScreenshotArtifact(string projectRoot, string absPath, string? scenario, string? step, string? label)
     {
-        var bridgeRoot = Path.Combine(projectRoot, "Library", "XLabMcpBridge");
+        var bridgeRoot = Path.Combine(projectRoot, "Library", "BreachMcpBridge");
         var screenshotRoot = Path.Combine(bridgeRoot, "screenshots");
         Directory.CreateDirectory(screenshotRoot);
 
@@ -3051,7 +3051,7 @@ namespace BreachScenarioEngine.Mcp.Editor
         {
             return (true, new JsonObject
             {
-                ["resource"] = "xlabmcp://localization/tables",
+                ["resource"] = "breachmcp://localization/tables",
                 ["tables"] = tables,
                 ["locales"] = new JsonArray(),
                 ["entryCounts"] = entryCounts,
@@ -3088,7 +3088,7 @@ namespace BreachScenarioEngine.Mcp.Editor
         var locales = new JsonArray(localeSet.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).Select(x => (JsonNode?)x).ToArray());
         var report = new JsonObject
         {
-            ["resource"] = "xlabmcp://localization/tables",
+            ["resource"] = "breachmcp://localization/tables",
             ["tables"] = tables,
             ["locales"] = locales,
             ["entryCounts"] = entryCounts,
@@ -3107,7 +3107,7 @@ namespace BreachScenarioEngine.Mcp.Editor
 
         var report = new JsonObject
         {
-            ["resource"] = "xlabmcp://localization/tables",
+            ["resource"] = "breachmcp://localization/tables",
             ["table"] = tableFilter ?? string.Empty,
             ["tables"] = new JsonArray(),
             ["locales"] = new JsonArray(),
@@ -5102,7 +5102,7 @@ namespace BreachScenarioEngine.Mcp.Editor
     private static string BridgeRoot()
     {
         var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-        return Path.Combine(projectRoot, "Library", "XLabMcpBridge");
+        return Path.Combine(projectRoot, "Library", "BreachMcpBridge");
     }
 
     private static GraphArgs ParseGraphArgs(string raw)
@@ -5738,13 +5738,13 @@ namespace BreachScenarioEngine.Mcp.Editor
 
     private static string BuildScriptableObjectTemplate(string className, string namespaceName)
     {
-        var ns = string.IsNullOrWhiteSpace(namespaceName) ? "xLabMcp.Data" : namespaceName.Trim();
+        var ns = string.IsNullOrWhiteSpace(namespaceName) ? "BreachScenarioEngine.Mcp.Data" : namespaceName.Trim();
         return
 $@"using UnityEngine;
 
 namespace {ns}
 {{
-[CreateAssetMenu(menuName = ""xLabMcp/Data/{className}"", fileName = ""{className}"")]
+[CreateAssetMenu(menuName = ""Breach/MCP/Data/{className}"", fileName = ""{className}"")]
     public sealed class {className} : ScriptableObject
     {{
     }}
@@ -5754,7 +5754,7 @@ namespace {ns}
 
     private static string BuildScriptTemplate(string className, string namespaceName, string baseClass)
     {
-        var ns = string.IsNullOrWhiteSpace(namespaceName) ? "xLabMcp.Scripts" : namespaceName.Trim();
+        var ns = string.IsNullOrWhiteSpace(namespaceName) ? "BreachScenarioEngine.Mcp.Scripts" : namespaceName.Trim();
         var safeBaseClass = string.IsNullOrWhiteSpace(baseClass) ? "MonoBehaviour" : baseClass.Trim();
         return
 $@"using UnityEngine;

@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Xunit;
 using BreachScenarioEngine.Mcp.Protocol;
@@ -55,7 +55,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ProjectRootSet_AllowsSubsequentAliasCallsWithoutProjectRoot()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         try
@@ -92,7 +92,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageAsset_CreateFolder_And_AssetExists_Work()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         try
@@ -141,7 +141,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageScript_CreateOrEdit_CreatesAndEditsScript()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         Directory.CreateDirectory(Path.Combine(root, "Assets", "Scripts"));
 
@@ -281,7 +281,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageScene_Create_QueuesBridgeCommand()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         try
@@ -303,7 +303,7 @@ public sealed class DispatcherTests
             using var doc = JsonDocument.Parse(json);
             var result = _dispatcher.HandleToolCall(doc.RootElement);
 
-            var cmdDir = Path.Combine(root, "Library", "XLabMcpBridge", "commands");
+            var cmdDir = Path.Combine(root, "Library", "BreachMcpBridge", "commands");
             Assert.False(result.IsError);
             Assert.True(Directory.Exists(cmdDir));
             Assert.NotEmpty(Directory.GetFiles(cmdDir, "*.json"));
@@ -320,7 +320,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageAsset_ReadWriteTextFile_QueuesBridgeCommand()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         try
@@ -372,7 +372,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageGameObject_InvokeMethod_QueuesBridgeCommand()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         try
@@ -396,7 +396,7 @@ public sealed class DispatcherTests
 
             var result = _dispatcher.HandleToolCall(doc.RootElement);
 
-            var cmdDir = Path.Combine(root, "Library", "XLabMcpBridge", "commands");
+            var cmdDir = Path.Combine(root, "Library", "BreachMcpBridge", "commands");
             Assert.False(result.IsError);
             Assert.Contains("queued:manage_gameobject", result.Content[0].Text);
             Assert.True(Directory.Exists(cmdDir));
@@ -414,7 +414,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageComponents_GetSerialized_QueuesBridgeCommand()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         try
@@ -436,7 +436,7 @@ public sealed class DispatcherTests
 
             var result = _dispatcher.HandleToolCall(doc.RootElement);
 
-            var cmdDir = Path.Combine(root, "Library", "XLabMcpBridge", "commands");
+            var cmdDir = Path.Combine(root, "Library", "BreachMcpBridge", "commands");
             Assert.False(result.IsError);
             Assert.Contains("queued:manage_components", result.Content[0].Text);
             Assert.True(Directory.Exists(cmdDir));
@@ -454,7 +454,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageComponents_SetSerialized_QueuesBridgeCommand()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         try
@@ -480,7 +480,7 @@ public sealed class DispatcherTests
 
             var result = _dispatcher.HandleToolCall(doc.RootElement);
 
-            var cmdDir = Path.Combine(root, "Library", "XLabMcpBridge", "commands");
+            var cmdDir = Path.Combine(root, "Library", "BreachMcpBridge", "commands");
             Assert.False(result.IsError);
             Assert.Contains("queued:manage_components", result.Content[0].Text);
             Assert.True(Directory.Exists(cmdDir));
@@ -498,7 +498,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageLocalization_Tables_QueuesBridgeCommand()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         try
@@ -518,7 +518,7 @@ public sealed class DispatcherTests
 
             var result = _dispatcher.HandleToolCall(doc.RootElement);
 
-            var cmdDir = Path.Combine(root, "Library", "XLabMcpBridge", "commands");
+            var cmdDir = Path.Combine(root, "Library", "BreachMcpBridge", "commands");
             Assert.False(result.IsError);
             Assert.Contains("queued:manage_localization", result.Content[0].Text);
             Assert.True(Directory.Exists(cmdDir));
@@ -536,7 +536,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageAsset_ListLocalizationKeys_QueuesBridgeCommand()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         try
@@ -557,7 +557,7 @@ public sealed class DispatcherTests
 
             var result = _dispatcher.HandleToolCall(doc.RootElement);
 
-            var cmdDir = Path.Combine(root, "Library", "XLabMcpBridge", "commands");
+            var cmdDir = Path.Combine(root, "Library", "BreachMcpBridge", "commands");
             Assert.False(result.IsError);
             Assert.Contains("queued:manage_asset", result.Content[0].Text);
             Assert.True(Directory.Exists(cmdDir));
@@ -575,7 +575,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageAsset_ResolveLocalizationKeys_QueuesBridgeCommand()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         try
@@ -598,7 +598,7 @@ public sealed class DispatcherTests
 
             var result = _dispatcher.HandleToolCall(doc.RootElement);
 
-            var cmdDir = Path.Combine(root, "Library", "XLabMcpBridge", "commands");
+            var cmdDir = Path.Combine(root, "Library", "BreachMcpBridge", "commands");
             Assert.False(result.IsError);
             Assert.Contains("queued:manage_asset", result.Content[0].Text);
             Assert.True(Directory.Exists(cmdDir));
@@ -616,7 +616,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageBuild_GetActive_QueuesBridgeCommand()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         try
@@ -637,7 +637,7 @@ public sealed class DispatcherTests
 
             var result = _dispatcher.HandleToolCall(doc.RootElement);
 
-            var cmdDir = Path.Combine(root, "Library", "XLabMcpBridge", "commands");
+            var cmdDir = Path.Combine(root, "Library", "BreachMcpBridge", "commands");
             Assert.False(result.IsError);
             Assert.Contains("queued:manage_build", result.Content[0].Text);
             Assert.True(Directory.Exists(cmdDir));
@@ -655,7 +655,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageBuild_SetActive_QueuesBridgeCommand()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         try
@@ -677,7 +677,7 @@ public sealed class DispatcherTests
 
             var result = _dispatcher.HandleToolCall(doc.RootElement);
 
-            var cmdDir = Path.Combine(root, "Library", "XLabMcpBridge", "commands");
+            var cmdDir = Path.Combine(root, "Library", "BreachMcpBridge", "commands");
             Assert.False(result.IsError);
             Assert.Contains("queued:manage_build", result.Content[0].Text);
             Assert.True(Directory.Exists(cmdDir));
@@ -716,7 +716,7 @@ public sealed class DispatcherTests
     [InlineData("manage_localization")]
     public void HandleToolCall_BridgeTools_QueueCommand(string toolName)
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         try
@@ -762,7 +762,7 @@ public sealed class DispatcherTests
             using var doc = JsonDocument.Parse(json);
             var result = _dispatcher.HandleToolCall(doc.RootElement);
 
-            var cmdDir = Path.Combine(root, "Library", "XLabMcpBridge", "commands");
+            var cmdDir = Path.Combine(root, "Library", "BreachMcpBridge", "commands");
             Assert.False(result.IsError);
             Assert.Contains($"queued:{toolName}", result.Content[0].Text);
             Assert.True(Directory.Exists(cmdDir));
@@ -780,7 +780,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ProjectInfo_ReturnsProjectMetadata()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         try
@@ -813,7 +813,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ProjectHealthCheck_ReturnsHealthSummary()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(root, "Packages"));
         File.WriteAllText(Path.Combine(root, "Packages", "manifest.json"), "{\"dependencies\":{}}");
 
@@ -845,7 +845,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_BridgeToolWithoutArguments_DoesNotCrash()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
@@ -884,7 +884,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ValidationError_ForMissingRequiredProperty()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
@@ -917,7 +917,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageAssetClassifyRisk_QueuesCommand()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
@@ -937,7 +937,7 @@ public sealed class DispatcherTests
             using var doc = JsonDocument.Parse(json);
             var result = _dispatcher.HandleToolCall(doc.RootElement);
 
-            var cmdDir = Path.Combine(root, "Library", "XLabMcpBridge", "commands");
+            var cmdDir = Path.Combine(root, "Library", "BreachMcpBridge", "commands");
             Assert.False(result.IsError);
             Assert.Contains("queued:manage_asset", result.Content[0].Text);
             Assert.True(Directory.Exists(cmdDir));
@@ -955,7 +955,7 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageGraphicsValidateProfileAssignment_QueuesCommand()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
@@ -975,7 +975,7 @@ public sealed class DispatcherTests
             using var doc = JsonDocument.Parse(json);
             var result = _dispatcher.HandleToolCall(doc.RootElement);
 
-            var cmdDir = Path.Combine(root, "Library", "XLabMcpBridge", "commands");
+            var cmdDir = Path.Combine(root, "Library", "BreachMcpBridge", "commands");
             Assert.False(result.IsError);
             Assert.Contains("queued:manage_graphics", result.Content[0].Text);
             Assert.True(Directory.Exists(cmdDir));
@@ -993,13 +993,13 @@ public sealed class DispatcherTests
     [Fact]
     public void HandleToolCall_ManageEditorInstallUpdateDelete_ManagesEmbeddedUnityPackage()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
-        var source = Path.Combine(Path.GetTempPath(), "xlab-mcp-package-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var source = Path.Combine(Path.GetTempPath(), "breach-mcp-package-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(Path.Combine(root, "Packages"));
         Directory.CreateDirectory(Path.Combine(source, "Editor"));
         File.WriteAllText(Path.Combine(source, "package.json"), """
         {
-          "name": "com.xlabkm.unity-mcp",
+          "name": "com.breachscenarioengine.unity-mcp",
           "version": "1.2.3"
         }
         """);
@@ -1026,7 +1026,7 @@ public sealed class DispatcherTests
             Assert.Equal("install", installPayload.RootElement.GetProperty("action").GetString());
             Assert.True(installPayload.RootElement.GetProperty("changed").GetBoolean());
 
-            var embeddedPackagePath = Path.Combine(root, "Packages", "com.xlabkm.unity-mcp");
+            var embeddedPackagePath = Path.Combine(root, "Packages", "com.breachscenarioengine.unity-mcp");
             Assert.True(File.Exists(Path.Combine(embeddedPackagePath, "package.json")));
             Assert.True(File.Exists(Path.Combine(embeddedPackagePath, "Editor", "McpBridgeProcessor.cs")));
 
@@ -1089,7 +1089,7 @@ public sealed class DispatcherTests
     [Fact]
     public async Task HandleToolCall_BridgeRoundtrip_ReturnsBridgeResponse()
     {
-        var root = Path.Combine(Path.GetTempPath(), "xlab-mcp-test-" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
@@ -1117,8 +1117,8 @@ public sealed class DispatcherTests
 
             var bridgeTask = Task.Run(async () =>
             {
-                var cmdDir = Path.Combine(root, "Library", "XLabMcpBridge", "commands");
-                var rspDir = Path.Combine(root, "Library", "XLabMcpBridge", "responses");
+                var cmdDir = Path.Combine(root, "Library", "BreachMcpBridge", "commands");
+                var rspDir = Path.Combine(root, "Library", "BreachMcpBridge", "responses");
                 Directory.CreateDirectory(cmdDir);
                 Directory.CreateDirectory(rspDir);
 

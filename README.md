@@ -21,6 +21,12 @@ Initial project scaffold for **TACTICAL BREACH: Mission Architect / Breach Scena
 3. Run the MCP / Unity generation pipeline
 4. Store deterministic outputs in the mission folder
 
+## Docs
+
+- [Docs/README.md](Docs/README.md)
+- [Docs/index.md](Docs/index.md)
+- [Docs/breach_mcp_architecture_v2.2.md](Docs/breach_mcp_architecture_v2.2.md)
+
 ## Standards
 
 - C# uses 4-space indentation.

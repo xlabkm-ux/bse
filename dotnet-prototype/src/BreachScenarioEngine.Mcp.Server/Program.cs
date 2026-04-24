@@ -9,7 +9,7 @@ server.Run();
 
 public sealed class McpRequestDispatcher
 {
-    private const string UnityMcpPackageName = "com.xlabkm.unity-mcp";
+    private const string UnityMcpPackageName = "com.breachscenarioengine.unity-mcp";
     private const string Urp = "com.unity.render-pipelines.universal";
     private string? _defaultProjectRoot;
     private readonly Dictionary<string, JsonObject> _toolSchemas = BuildToolSchemas();
@@ -566,7 +566,7 @@ public sealed class McpRequestDispatcher
         var path = Path.Combine(scriptsDir, Ident(name) + ".cs");
         var content =
             "using UnityEngine;\n\n" +
-$"[CreateAssetMenu(menuName = \"xLabMcp/{Ident(name)}\")]\n" +
+$"[CreateAssetMenu(menuName = \"Breach Scenario Engine MCP/{Ident(name)}\")]\n" +
             $"public sealed class {Ident(name)} : ScriptableObject {{ }}\n";
         File.WriteAllText(path, content, Encoding.UTF8);
         return Ok($"manage_scriptableobject create_or_edit: {path}");
@@ -956,7 +956,7 @@ $"[CreateAssetMenu(menuName = \"xLabMcp/{Ident(name)}\")]\n" +
                !(v.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(v.GetString()));
     }
     private static bool HasAnyArg(JsonElement a, params string[] keys) => keys.Any(k => HasArg(a, k));
-    private static string BridgeRoot(string root) => Path.Combine(root, "Library", "XLabMcpBridge");
+    private static string BridgeRoot(string root) => Path.Combine(root, "Library", "BreachMcpBridge");
     private static bool PathsEqual(string left, string right) =>
         string.Equals(
             Path.GetFullPath(left).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
@@ -1099,7 +1099,7 @@ $"[CreateAssetMenu(menuName = \"xLabMcp/{Ident(name)}\")]\n" +
         var contractPath = ResolveContractPath();
         if (contractPath == null)
         {
-        throw new InvalidOperationException("xLabMcp contract file not found: contracts/xlabmcp-tools.schema.json");
+        throw new InvalidOperationException("Breach Scenario Engine MCP contract file not found: contracts/breachscenarioengine-mcp-tools.schema.json");
         }
 
         var node = JsonNode.Parse(File.ReadAllText(contractPath)) as JsonObject;
@@ -1129,11 +1129,11 @@ $"[CreateAssetMenu(menuName = \"xLabMcp/{Ident(name)}\")]\n" +
     {
         var candidates = new[]
         {
-            Path.Combine(AppContext.BaseDirectory, "contracts", "xlabmcp-tools.schema.json"),
-            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "contracts", "xlabmcp-tools.schema.json"),
-            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "contracts", "xlabmcp-tools.schema.json"),
-            Path.Combine(Directory.GetCurrentDirectory(), "contracts", "xlabmcp-tools.schema.json"),
-            Path.Combine(Directory.GetCurrentDirectory(), "dotnet-prototype", "contracts", "xlabmcp-tools.schema.json"),
+            Path.Combine(AppContext.BaseDirectory, "contracts", "breachscenarioengine-mcp-tools.schema.json"),
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "contracts", "breachscenarioengine-mcp-tools.schema.json"),
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "contracts", "breachscenarioengine-mcp-tools.schema.json"),
+            Path.Combine(Directory.GetCurrentDirectory(), "contracts", "breachscenarioengine-mcp-tools.schema.json"),
+            Path.Combine(Directory.GetCurrentDirectory(), "dotnet-prototype", "contracts", "breachscenarioengine-mcp-tools.schema.json"),
         };
 
         foreach (var path in candidates.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase))

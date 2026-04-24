@@ -1,13 +1,13 @@
-# xLabMcp Server Backlog
+# Breach Scenario Engine MCP Server Backlog
 
 Date: 2026-04-06
-Project: `xLabMcp`
-Server: `XLab.UnityMcp.Server`
-Bridge target: Unity Editor + `Library/XLabMcpBridge`
+Project: `Breach Scenario Engine`
+Server: `BreachScenarioEngine.Mcp.Server`
+Bridge target: Unity Editor + `Library/BreachMcpBridge`
 
 ## Goal
 
-Convert the current xLabMcp bridge/server into a stable Unity-native automation layer that lets the Codex agent run gameplay development and verification without manual Editor clicking.
+Convert the current Breach Scenario Engine MCP bridge/server into a stable Unity-native automation layer that lets the Codex agent run gameplay development and verification without manual Editor clicking.
 
 This backlog is based on the legacy notes below, which are now archived:
 
@@ -17,7 +17,7 @@ This backlog is based on the legacy notes below, which are now archived:
 
 It remains aligned with the active Unity verification contract and canonical tools list:
 
-- [xlab_mcp_verification_contract.md](xlab_mcp_verification_contract.md)
+- [breach_mcp_verification_contract.md](breach_mcp_verification_contract.md)
 - [canonical_tools.md](canonical_tools.md)
 
 The current runtime tool inventory is documented in [runtime_tools.md](runtime_tools.md).
@@ -68,7 +68,7 @@ Confirmed weak areas:
 
 ## P0 - Verification Blockers
 
-### XLAB-001 - Runtime tool capability probe
+### BSE-001 - Runtime tool capability probe
 
 - Priority: `P0`
 - Complexity: `M`
@@ -83,7 +83,7 @@ Confirmed weak areas:
 - Unlocks:
   - reliable preflight for all steps
 
-### XLAB-002 - Deterministic test job finalization
+### BSE-002 - Deterministic test job finalization
 
 - Priority: `P0`
 - Complexity: `M`
@@ -100,7 +100,7 @@ Confirmed weak areas:
 - Unlocks:
   - the test finalization workflow
 
-### XLAB-003 - Scene reference validation action
+### BSE-003 - Scene reference validation action
 
 - Priority: `P0`
 - Complexity: `M`
@@ -117,7 +117,7 @@ Confirmed weak areas:
 - Unlocks:
   - scene and prefab validation workflows
 
-### XLAB-004 - Prefab reference validation action
+### BSE-004 - Prefab reference validation action
 
 - Priority: `P0`
 - Complexity: `M`
@@ -134,7 +134,7 @@ Confirmed weak areas:
 - Unlocks:
   - scene and prefab validation workflows
 
-### XLAB-005 - Play mode lifecycle control
+### BSE-005 - Play mode lifecycle control
 
 - Priority: `P0`
 - Complexity: `M`
@@ -150,7 +150,7 @@ Confirmed weak areas:
 - Unlocks:
   - play scenario workflows
 
-### XLAB-006 - Input injection for gameplay verification
+### BSE-006 - Input injection for gameplay verification
 
 - Priority: `P0`
 - Complexity: `L`
@@ -169,7 +169,7 @@ Confirmed weak areas:
 
 ## P1 - Full Verification Coverage
 
-### XLAB-007 - Serialized component read/write actions
+### BSE-007 - Serialized component read/write actions
 
 - Priority: `P1`
 - Complexity: `M`
@@ -186,7 +186,7 @@ Confirmed weak areas:
 - Unlocks:
   - serialized state workflows
 
-### XLAB-008 - Method invocation on scene objects
+### BSE-008 - Method invocation on scene objects
 
 - Priority: `P1`
 - Complexity: `M`
@@ -202,12 +202,12 @@ Confirmed weak areas:
 - Unlocks:
   - gameplay invocation workflows
 
-### XLAB-009 - Localization tables resource
+### BSE-009 - Localization tables resource
 
 - Priority: `P1`
 - Complexity: `M`
 - Status: completed
-- Goal: add `xlabmcp://localization/tables`
+- Goal: add `breachmcp://localization/tables`
 - Why: localization coverage must be checked via Unity data, not by parsing arbitrary assets blindly
 - Deliverables:
   - table list
@@ -219,7 +219,7 @@ Confirmed weak areas:
 - Unlocks:
   - the localization workflow
 
-### XLAB-010 - Localization key listing and resolving
+### BSE-010 - Localization key listing and resolving
 
 - Priority: `P1`
 - Complexity: `M`
@@ -231,11 +231,11 @@ Confirmed weak areas:
   - resolve values by locale
   - explicit `missing` and `empty` lists
 - Dependencies:
-  - `XLAB-009`
+  - `BSE-009`
 - Unlocks:
   - the localization workflow
 
-### XLAB-011 - Build profile inspection and switching
+### BSE-011 - Build profile inspection and switching
 
 - Priority: `P1`
 - Complexity: `L`
@@ -252,7 +252,7 @@ Confirmed weak areas:
 - Unlocks:
   - platform workflows
 
-### XLAB-012 - Quality level switching for visual verification
+### BSE-012 - Quality level switching for visual verification
 
 - Priority: `P1`
 - Complexity: `S`
@@ -267,7 +267,7 @@ Confirmed weak areas:
 - Unlocks:
   - platform workflows
 
-### XLAB-013 - Profiler counters verification pack
+### BSE-013 - Profiler counters verification pack
 
 - Priority: `P1`
 - Complexity: `M`
@@ -284,7 +284,7 @@ Confirmed weak areas:
 - Unlocks:
   - profiler and release workflows
 
-### XLAB-014 - Controlled save diagnostics file workflow
+### BSE-014 - Controlled save diagnostics file workflow
 
 - Priority: `P1`
 - Complexity: `M`
@@ -303,7 +303,7 @@ Confirmed weak areas:
 
 ## P2 - Robustness and Developer Experience
 
-### XLAB-015 - Bridge watchdog and recovery diagnostics
+### BSE-015 - Bridge watchdog and recovery diagnostics
 
 - Priority: `P2`
 - Complexity: `L`
@@ -320,7 +320,7 @@ Confirmed weak areas:
 - Improves:
   - all steps
 
-### XLAB-016 - Canonical contract cleanup across docs and server help
+### BSE-016 - Canonical contract cleanup across docs and server help
 
 - Priority: `P2`
 - Complexity: `M`
@@ -336,7 +336,7 @@ Confirmed weak areas:
 - Improves:
   - onboarding, prompt reliability, lower confusion
 
-### XLAB-017 - Structured operation audit trail
+### BSE-017 - Structured operation audit trail
 
 - Priority: `P2`
 - Complexity: `M`
@@ -349,7 +349,7 @@ Confirmed weak areas:
 - Dependencies:
   - none
 
-### XLAB-018 - Screenshot artifact indexing
+### BSE-018 - Screenshot artifact indexing
 
 - Priority: `P2`
 - Complexity: `S`
@@ -364,7 +364,7 @@ Confirmed weak areas:
 
 ## P3 - Future-facing Extensions
 
-### XLAB-019 - Graph inspection parity
+### BSE-019 - Graph inspection parity
 
 - Priority: `P3`
 - Complexity: `XL`
@@ -374,7 +374,7 @@ Confirmed weak areas:
 - Dependencies:
   - graph serialization/editor API work
 
-### XLAB-020 - Scenario macros / reusable verification recipes
+### BSE-020 - Scenario macros / reusable verification recipes
 
 - Priority: `P3`
 - Complexity: `L`
@@ -384,7 +384,7 @@ Confirmed weak areas:
 - Dependencies:
   - play mode, input, screenshot, profiler, test result stability
 
-### XLAB-021 - Build smoke automation
+### BSE-021 - Build smoke automation
 
 - Priority: `P3`
 - Complexity: `L`
@@ -398,12 +398,12 @@ Confirmed weak areas:
 
 ### Wave 1 - Unblock autonomous verification
 
-- `XLAB-001`
-- `XLAB-002`
-- `XLAB-003`
-- `XLAB-004`
-- `XLAB-005`
-- `XLAB-006`
+- `BSE-001`
+- `BSE-002`
+- `BSE-003`
+- `BSE-004`
+- `BSE-005`
+- `BSE-006`
 
 Outcome:
 
@@ -411,25 +411,25 @@ Outcome:
 
 ### Wave 2 - Close verification end-to-end
 
-- `XLAB-007`
-- `XLAB-008`
-- `XLAB-009`
-- `XLAB-010`
-- `XLAB-011`
-- `XLAB-012`
-- `XLAB-013`
-- `XLAB-014`
+- `BSE-007`
+- `BSE-008`
+- `BSE-009`
+- `BSE-010`
+- `BSE-011`
+- `BSE-012`
+- `BSE-013`
+- `BSE-014`
 
 Outcome:
 
-- Codex can perform the full verification matrix for `xLabMcp` without manual Unity interaction.
+- Codex can perform the full verification matrix for `Breach Scenario Engine MCP` without manual Unity interaction.
 
 ### Wave 3 - Harden the platform
 
-- `XLAB-015`
-- `XLAB-016`
-- `XLAB-017`
-- `XLAB-018`
+- `BSE-015`
+- `BSE-016`
+- `BSE-017`
+- `BSE-018`
 
 Outcome:
 
@@ -437,9 +437,9 @@ Outcome:
 
 ### Wave 4 - Expand product surface
 
-- `XLAB-019`
-- `XLAB-020`
-- `XLAB-021`
+- `BSE-019`
+- `BSE-020`
+- `BSE-021`
 
 Outcome:
 
@@ -447,7 +447,7 @@ Outcome:
 
 ## Success Criteria
 
-The `xLabMcp` server backlog can be considered successfully delivered for current project goals when:
+The `Breach Scenario Engine MCP` server backlog can be considered successfully delivered for current project goals when:
 
 - Wave 1 and Wave 2 are complete
 - Codex can execute the full verification workflow from prompt alone

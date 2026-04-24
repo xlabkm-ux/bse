@@ -1,6 +1,6 @@
 # Workspace Index
 
-Short map of the main working areas in the `xLabMcp` repository.
+Short map of the main working areas in the Breach Scenario Engine repository.
 
 | Path | Purpose |
 |---|---|
@@ -20,8 +20,8 @@ Short map of the main working areas in the `xLabMcp` repository.
 
 ## Where to work
 
-- Server behavior: `dotnet-prototype/src/XLab.UnityMcp.Server`
-- Unity bridge behavior: `dotnet-prototype/unity/com.xlabkm.unity-mcp`
+- Server behavior: `dotnet-prototype/src/BreachScenarioEngine.Mcp.Server`
+- Unity bridge behavior: `dotnet-prototype/unity/com.breachscenarioengine.unity-mcp`
 - Contract and schema updates: `dotnet-prototype/contracts`
 - Validation and runtime checks: `dotnet-prototype/tests`
 - Human-facing guidance: `Docs/` and `mcp/`

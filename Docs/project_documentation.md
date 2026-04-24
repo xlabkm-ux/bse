@@ -1,7 +1,7 @@
-# xLabMcp Project Documentation
+# Breach Scenario Engine Project Documentation
 
 Date: 2026-04-07
-Project: `xLabMcp`
+Project: `Breach Scenario Engine`
 
 This document is the single map for the project documentation set.
 It explains what each document covers, how to read it, and how the runtime
@@ -20,6 +20,14 @@ and server-side workflow are supposed to be used.
   - Index of the active documentation
   - Read-first map for server-side work
 
+- [Docs/mission_template_v2.2.md](mission_template_v2.2.md)
+  - Canonical mission template specification
+  - Source of truth for mission authoring and validation
+
+- [Docs/breach_mcp_architecture_v2.2.md](breach_mcp_architecture_v2.2.md)
+  - Technical architecture specification
+  - Defines layout-first orchestration, occlusion math, and retry policy
+
 - [mcp/README.md](../mcp/README.md)
   - Index of MCP contracts, prompts, policies, resources, and validators
 
@@ -33,11 +41,11 @@ and server-side workflow are supposed to be used.
   - What the current runtime actually exposes today
   - Useful for checking drift between code and target contract
 
-- [Docs/xlab_mcp_verification_contract.md](xlab_mcp_verification_contract.md)
+- [Docs/breach_mcp_verification_contract.md](breach_mcp_verification_contract.md)
   - Required resources and tools for verification
   - Machine-readable expectations for the bridge and server
 
-- [Docs/xlab_mcp_server_backlog.md](xlab_mcp_server_backlog.md)
+- [Docs/breach_mcp_server_backlog.md](breach_mcp_server_backlog.md)
   - Remaining server-side work items
   - Priorities, dependencies, and completion status
 
@@ -66,8 +74,8 @@ and server-side workflow are supposed to be used.
 2. [Docs/README.md](README.md)
 3. [Docs/canonical_tools.md](canonical_tools.md)
 4. [Docs/runtime_tools.md](runtime_tools.md)
-5. [Docs/xlab_mcp_verification_contract.md](xlab_mcp_verification_contract.md)
-6. [Docs/xlab_mcp_server_backlog.md](xlab_mcp_server_backlog.md)
+5. [Docs/breach_mcp_verification_contract.md](breach_mcp_verification_contract.md)
+6. [Docs/breach_mcp_server_backlog.md](breach_mcp_server_backlog.md)
 7. [mcp/README.md](../mcp/README.md)
 8. [Docs/Archive/README.md](Archive/README.md) only if you need history
 
@@ -115,13 +123,13 @@ needed for verification.
 - Controlled diagnostics file access is limited to `Library/McpDiagnostics`
 - Health payloads expose heartbeat, queue depth, audit trail, and screenshot
   indexing status
-- Screenshot artifacts are indexed under `Library/XLabMcpBridge/screenshots`
+- Screenshot artifacts are indexed under `Library/BreachMcpBridge/screenshots`
 - `manage_editor` also owns Unity MCP package lifecycle operations:
-  `install`, `update`, and `delete` for the embedded `Packages/com.xlabkm.unity-mcp` package
+  `install`, `update`, and `delete` for the embedded `Packages/com.breachscenarioengine.unity-mcp` package
 
 ## 4. Verification Workflow
 
-Use this order when driving xLabMcp:
+Use this order when driving Breach Scenario Engine MCP:
 
 1. Check `project.health_check`.
 2. Read `project.capabilities`.
@@ -150,7 +158,7 @@ Purpose:
 
 - `Docs/canonical_tools.md`
 - `Docs/runtime_tools.md`
-- `Docs/xlab_mcp_verification_contract.md`
+- `Docs/breach_mcp_verification_contract.md`
 
 Purpose:
 - define what the runtime should do
@@ -159,7 +167,7 @@ Purpose:
 
 ### C. Delivery state
 
-- `Docs/xlab_mcp_server_backlog.md`
+- `Docs/breach_mcp_server_backlog.md`
 
 Purpose:
 - track what is done and what remains
@@ -171,9 +179,12 @@ Purpose:
 - `mcp/policies/*`
 - `mcp/resources/*`
 - `mcp/validators/*`
+- `Docs/breach_mcp_architecture_v2.2.md`
+- `Docs/mission_template_v2.2.md`
 
 Purpose:
 - capture reusable recipes, guardrails, and release checks
+- define the current pipeline and mission template contracts
 
 ### E. History
 
@@ -186,7 +197,7 @@ Purpose:
 
 The server backlog is complete:
 
-- `XLAB-001` to `XLAB-021` are marked `completed`
+- `BSE-001` to `BSE-021` are marked `completed`
 - the active runtime inventory is target-only
 - the bridge includes capability, health, audit, diagnostics, screenshot
   indexing, localization validation, build, profiler, save, schema
@@ -199,8 +210,8 @@ The server backlog is complete:
 2. Keep reusable prompt and workflow assets in `mcp/`.
 3. Move obsolete notes into `Docs/Archive/` instead of deleting history.
 4. Keep `canonical_tools.md` and `runtime_tools.md` in sync with the code.
-5. Update `xlab_mcp_server_backlog.md` when implementation status changes.
-6. Update `xlab_mcp_verification_contract.md` whenever runtime payload fields
+5. Update `breach_mcp_server_backlog.md` when implementation status changes.
+6. Update `breach_mcp_verification_contract.md` whenever runtime payload fields
    change.
 7. Keep `bin/` and `obj/` out of version control.
 

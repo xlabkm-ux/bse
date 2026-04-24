@@ -1,8 +1,8 @@
-# xLabMcp Verification Contract
+# Breach Scenario Engine MCP Verification Contract
 
 Date: 2026-04-06
-Project: `xLabMcp`
-Scope: Unity-side verification for the core xLabMcp gameplay, safety, and release workflows.
+Project: `Breach Scenario Engine`
+Scope: Unity-side verification for the core Breach Scenario Engine MCP gameplay, safety, and release workflows.
 
 ## Goal
 
@@ -17,7 +17,7 @@ Define the minimum MCP `resources` and `tools` required for the Codex agent to e
 - Windows readability/input sanity
 - final candidate verification gate
 
-This contract is intentionally aligned to the target xLabMcp style documented in:
+This contract is intentionally aligned to the target Breach Scenario Engine MCP style documented in:
 
 - `README.md`
 - `Docs/README.md`
@@ -27,16 +27,16 @@ This contract is intentionally aligned to the target xLabMcp style documented in
 The current runtime and Unity bridge expose a target-only public inventory; see
 `Docs/runtime_tools.md`.
 
-The contract must preserve the xLabMcp naming model:
+The contract must preserve the Breach Scenario Engine MCP naming model:
 
-- use `xlabmcp://...` resources for read-only state
+- use `breachmcp://...` resources for read-only state
 - use the target canonical tool names listed in `Docs/canonical_tools.md`
 - only add new actions where the current Unity contract does not yet cover the required verification workflow
 
 ## Contract Principles
 
 1. Resource-first workflow.
-   Read `xlabmcp://editor/state` and project/scene resources before mutating Editor state.
+   Read `breachmcp://editor/state` and project/scene resources before mutating Editor state.
 
 2. No parallel contract fork.
    Do not invent a second naming system when the canonical tools document already defines the approved names.
@@ -55,7 +55,7 @@ The contract must preserve the xLabMcp naming model:
 
 ## Canonical Resources
 
-### `xlabmcp://editor/state`
+### `breachmcp://editor/state`
 
 Status: existing canonical resource.
 
@@ -88,7 +88,7 @@ Required fields:
 
 
 
-### `xlabmcp://project/info`
+### `breachmcp://project/info`
 
 Status: existing canonical resource.
 
@@ -110,7 +110,7 @@ Required fields:
 
 
 
-### `xlabmcp://scene/hierarchy`
+### `breachmcp://scene/hierarchy`
 
 Status: existing shape exposed by the bridge; keep the resource name canonical across docs.
 
@@ -129,7 +129,7 @@ Required fields per item:
 
 
 
-### `xlabmcp://scene/gameobject/{instanceId}`
+### `breachmcp://scene/gameobject/{instanceId}`
 
 Status: existing canonical pattern in the skill docs.
 
@@ -153,7 +153,7 @@ Each component entry must include:
 
 
 
-### `xlabmcp://tests/{mode}`
+### `breachmcp://tests/{mode}`
 
 Status: consistent with workflow docs.
 
@@ -170,7 +170,7 @@ Required fields:
 
 
 
-### `xlabmcp://localization/tables`
+### `breachmcp://localization/tables`
 
 Status: implemented in current runtime.
 
@@ -183,7 +183,7 @@ Required fields:
 
 
 
-### `xlabmcp://quality/profiles`
+### `breachmcp://quality/profiles`
 
 Status: new resource recommended.
 
@@ -555,7 +555,7 @@ Status: canonical Unity MCP package lifecycle actions.
 Purpose:
 
 Allow the server runtime to install, refresh, or remove the embedded
-`Packages/com.xlabkm.unity-mcp` package in a target Unity project without
+`Packages/com.breachscenarioengine.unity-mcp` package in a target Unity project without
 requiring the bridge to already be active.
 
 Request fields:
@@ -973,7 +973,7 @@ This contract should not add:
 5. `manage_input(action="send")`
 6. `manage_components(action="get_serialized")`
 7. `manage_components(action="set_serialized")`
-8. `xlabmcp://localization/tables`
+8. `breachmcp://localization/tables`
 9. `manage_asset(action="list_localization_keys")`
 10. `manage_asset(action="resolve_localization_keys")`
 11. `manage_build(action="profiles")`
@@ -982,7 +982,7 @@ This contract should not add:
 
 ## Acceptance Criteria
 
-The xLabMcp bridge is ready for Codex-driven verification when:
+The Breach Scenario Engine MCP bridge is ready for Codex-driven verification when:
 
 - Codex can run the full verification pass without manual clicking in Unity
 - all findings are returned as structured payloads
