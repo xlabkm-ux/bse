@@ -1,6 +1,6 @@
 # Docs Index
 
-Short entry point for the active xLabMcp documentation.
+Short entry point for the active Breach Scenario Engine MCP documentation.
 
 | Document | Purpose |
 |---|---|

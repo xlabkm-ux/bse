@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using XLab.UnityMcp.Protocol;
+using BreachScenarioEngine.Mcp.Protocol;
 
 var server = new McpServer(new McpRequestDispatcher());
 server.Run();
@@ -16,7 +16,7 @@ public sealed class McpRequestDispatcher
 
     public InitializeResult BuildInitializeResult() => new(
         McpProtocol.Version,
-        new ServerInfo("XLab.UnityMcp.Server", "0.3.0"),
+        new ServerInfo("BreachScenarioEngine.Mcp.Server", "0.3.0"),
         new { tools = new { listChanged = false } });
 
     public ToolsListResult BuildToolsList()

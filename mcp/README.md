@@ -1,6 +1,6 @@
 # MCP Contracts
 
-Server-side prompts, policies, resources, and validators used by xLabMcp.
+Server-side prompts, policies, resources, and validators used by the Breach Scenario Engine MCP stack.
 
 ## Contents
 

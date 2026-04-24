@@ -1,6 +1,6 @@
 # MCP Index
 
-Short entry point for server-side prompts, policies, resources, and validators.
+Short entry point for server-side prompts, policies, resources, and validators used by the Breach Scenario Engine MCP stack.
 
 | Item | Purpose |
 |---|---|

@@ -1,6 +1,6 @@
 # Active Docs
 
-Server-side planning and verification docs for xLabMcp.
+Server-side planning and verification docs for the Breach Scenario Engine MCP stack.
 
 ## Active docs
 

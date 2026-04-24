@@ -1,9 +1,9 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using Xunit;
-using XLab.UnityMcp.Protocol;
+using BreachScenarioEngine.Mcp.Protocol;
 
-namespace XLab.UnityMcp.Server.Tests;
+namespace BreachScenarioEngine.Mcp.Server.Tests;
 
 public sealed class DispatcherTests
 {
@@ -15,7 +15,7 @@ public sealed class DispatcherTests
         var result = _dispatcher.BuildInitializeResult();
 
         Assert.Equal(McpProtocol.Version, result.ProtocolVersion);
-        Assert.Equal("XLab.UnityMcp.Server", result.ServerInfo.Name);
+        Assert.Equal("BreachScenarioEngine.Mcp.Server", result.ServerInfo.Name);
     }
 
     [Fact]

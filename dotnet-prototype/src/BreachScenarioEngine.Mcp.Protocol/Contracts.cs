@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Nodes;
 
-namespace XLab.UnityMcp.Protocol;
+namespace BreachScenarioEngine.Mcp.Protocol;
 
 public static class McpProtocol
 {

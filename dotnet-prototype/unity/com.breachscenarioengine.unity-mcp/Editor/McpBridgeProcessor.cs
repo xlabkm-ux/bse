@@ -18,7 +18,7 @@ using Unity.Profiling;
 
 #nullable enable
 
-namespace XLab.UnityMcp.Editor
+namespace BreachScenarioEngine.Mcp.Editor
 {
     [InitializeOnLoad]
     public static class McpBridgeProcessor
@@ -85,7 +85,7 @@ namespace XLab.UnityMcp.Editor
         try
         {
             var projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
-            var bridgeRoot = Path.Combine(projectRoot, "Library", "XLabMcpBridge");
+            var bridgeRoot = Path.Combine(projectRoot, "Library", "BreachMcpBridge");
             var commands = Path.Combine(bridgeRoot, "commands");
             var responses = Path.Combine(bridgeRoot, "responses");
             Directory.CreateDirectory(commands);

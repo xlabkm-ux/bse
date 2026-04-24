@@ -5,11 +5,11 @@ using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
-namespace XLab.UnityMcp.Editor
+namespace BreachScenarioEngine.Mcp.Editor
 {
     public static class McpPrototypeMenu
     {
-        [MenuItem("XLab/MCP/Start Prototype Server")]
+        [MenuItem("Breach/MCP/Start Server")]
         public static void StartPrototypeServer()
         {
             var serverPath = ResolveServerPath();
@@ -56,8 +56,8 @@ namespace XLab.UnityMcp.Editor
         {
             return new[]
             {
-                Environment.GetEnvironmentVariable("XLAB_MCP_SERVER_PATH"),
-                Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "XLabMcpServerRuntime", "XLab.UnityMcp.Server.exe")),
+                Environment.GetEnvironmentVariable("BREACH_MCP_SERVER_PATH"),
+                Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Library", "BreachMcpServerRuntime", "BreachScenarioEngine.Mcp.Server.exe")),
             };
         }
     }

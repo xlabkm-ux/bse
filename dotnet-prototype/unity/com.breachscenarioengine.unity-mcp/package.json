@@ -1,0 +1,10 @@
+﻿{
+  "name": "com.breachscenarioengine.unity-mcp",
+  "version": "0.1.0",
+  "displayName": "Breach Scenario Engine MCP",
+  "description": "Unity Editor bridge for the Breach Scenario Engine MCP server.",
+  "unity": "2021.3",
+  "author": {
+    "name": "Breach Scenario Engine"
+  }
+}
