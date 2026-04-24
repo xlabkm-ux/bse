@@ -282,6 +282,9 @@
         "missionId": { "type": "string" },
         "templatePath": { "type": "string" },
         "payloadPath": { "type": "string" },
+        "layoutPath": { "type": "string" },
+        "entitiesPath": { "type": "string" },
+        "verificationPath": { "type": "string" },
         "manifestPath": { "type": "string" }
       },
       "additionalProperties": true

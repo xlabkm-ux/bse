@@ -1359,9 +1359,9 @@ namespace BreachScenarioEngine.Mcp.Editor
 
         AddCapability(capabilities, "manage_mission", "validate_template", true, "Mission template validation for the v2.2 authoring contract is supported.");
         AddCapability(capabilities, "manage_mission", "compile_payload", true, "Mission payload and compile report generation for the v2.2 data contract is supported.");
-        AddCapability(capabilities, "manage_mission", "generate_layout", false, "Mission layout generation is planned after payload compilation.");
-        AddCapability(capabilities, "manage_mission", "place_entities", false, "Post-layout entity placement is planned after layout generation.");
-        AddCapability(capabilities, "manage_mission", "verify", false, "Mission verification is planned after placement.");
+        AddCapability(capabilities, "manage_mission", "generate_layout", true, "Deterministic mission layout and tactical graph generation is supported.");
+        AddCapability(capabilities, "manage_mission", "place_entities", true, "Layout-gated actor and objective placement is supported.");
+        AddCapability(capabilities, "manage_mission", "verify", true, "Mission verification summary generation is supported.");
         AddCapability(capabilities, "manage_mission", "write_manifest", false, "Generation manifest writing is planned after verification.");
 
         AddCapability(capabilities, "run_tests", "run", true, "Test execution is supported.");

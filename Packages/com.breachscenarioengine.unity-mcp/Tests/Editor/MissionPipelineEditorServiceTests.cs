@@ -271,10 +271,107 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "ORDER_VIOLATION_STALE_LAYOUT_GRAPH"));
         }
 
-        private static string RawArgs(string templatePath, string payloadPath = null, string layoutPath = null, string entitiesPath = null)
+        [Test]
+        public void Verify_WithCurrentArtifacts_WritesMachineReadableSummary()
+        {
+            var templatePath = Path.Combine(_testRoot, "verify.template.yaml");
+            var payloadPath = Path.Combine(_testRoot, "mission_payload.generated.json");
+            var layoutPath = Path.Combine(_testRoot, "mission_layout.generated.json");
+            var entitiesPath = Path.Combine(_testRoot, "mission_entities.generated.json");
+            var summaryPath = Path.Combine(_testRoot, "verification_summary.json");
+            File.WriteAllText(templatePath, ValidTemplate("VS93_VerifyMission"));
+
+            var (compileSuccess, compileMessage) = MissionPipelineEditorService.Execute("compile_payload", RawArgs(templatePath, payloadPath));
+            Assert.True(compileSuccess, compileMessage);
+            RewritePayloadProfileRefsToTempAssets(payloadPath);
+            var (layoutSuccess, layoutMessage) = MissionPipelineEditorService.Execute("generate_layout", RawArgs(templatePath, payloadPath, layoutPath));
+            Assert.True(layoutSuccess, layoutMessage);
+            var (placementSuccess, placementMessage) = MissionPipelineEditorService.Execute("place_entities", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath));
+            Assert.True(placementSuccess, placementMessage);
+
+            var (success, message) = MissionPipelineEditorService.Execute("verify", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath, summaryPath));
+
+            Assert.True(success, message);
+            Assert.True(File.Exists(summaryPath));
+            using var resultDoc = JsonDocument.Parse(message);
+            Assert.AreEqual("PASS", resultDoc.RootElement.GetProperty("status").GetString());
+            using var summaryDoc = JsonDocument.Parse(File.ReadAllText(summaryPath));
+            var summary = summaryDoc.RootElement;
+            Assert.AreEqual("bse.verification_summary.v2.2", summary.GetProperty("schemaVersion").GetString());
+            Assert.AreEqual("PASS", summary.GetProperty("status").GetString());
+            Assert.AreEqual(2, summary.GetProperty("metrics").GetProperty("actorCount").GetInt32());
+            Assert.AreEqual(1, summary.GetProperty("metrics").GetProperty("objectiveCount").GetInt32());
+            Assert.AreEqual(0, summary.GetProperty("metrics").GetProperty("unreachableCriticalNodes").GetInt32());
+        }
+
+        [Test]
+        public void Verify_WithMissingProfileRef_FailsWithStructuredFinding()
+        {
+            var templatePath = Path.Combine(_testRoot, "verify-missing-profile.template.yaml");
+            var payloadPath = Path.Combine(_testRoot, "mission_payload.generated.json");
+            var layoutPath = Path.Combine(_testRoot, "mission_layout.generated.json");
+            var entitiesPath = Path.Combine(_testRoot, "mission_entities.generated.json");
+            var summaryPath = Path.Combine(_testRoot, "verification_summary.json");
+            File.WriteAllText(templatePath, ValidTemplate("VS92_ProfileMission"));
+
+            var (compileSuccess, compileMessage) = MissionPipelineEditorService.Execute("compile_payload", RawArgs(templatePath, payloadPath));
+            Assert.True(compileSuccess, compileMessage);
+            RewritePayloadProfileRefsToTempAssets(payloadPath);
+            using (var payloadDoc = JsonDocument.Parse(File.ReadAllText(payloadPath)))
+            {
+                var payload = JsonNode.Parse(payloadDoc.RootElement.GetRawText()).AsObject();
+                payload["profileRefs"]["performanceProfile"] = "Assets/Data/Mission/Profiles/DefinitelyMissingProfile.asset";
+                File.WriteAllText(payloadPath, payload.ToJsonString());
+            }
+
+            var (layoutSuccess, layoutMessage) = MissionPipelineEditorService.Execute("generate_layout", RawArgs(templatePath, payloadPath, layoutPath));
+            Assert.True(layoutSuccess, layoutMessage);
+            var (placementSuccess, placementMessage) = MissionPipelineEditorService.Execute("place_entities", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath));
+            Assert.True(placementSuccess, placementMessage);
+
+            var (success, message) = MissionPipelineEditorService.Execute("verify", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath, summaryPath));
+
+            Assert.False(success);
+            using var doc = JsonDocument.Parse(message);
+            Assert.AreEqual("FAIL", doc.RootElement.GetProperty("status").GetString());
+            var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
+            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "PROFILE_REF_MISSING"));
+        }
+
+        [Test]
+        public void Verify_WithDisconnectedObjective_FailsReachability()
+        {
+            var templatePath = Path.Combine(_testRoot, "verify-nav.template.yaml");
+            var payloadPath = Path.Combine(_testRoot, "mission_payload.generated.json");
+            var layoutPath = Path.Combine(_testRoot, "mission_layout.generated.json");
+            var entitiesPath = Path.Combine(_testRoot, "mission_entities.generated.json");
+            var summaryPath = Path.Combine(_testRoot, "verification_summary.json");
+            File.WriteAllText(templatePath, ValidTemplate("VS91_NavMission"));
+
+            Assert.True(MissionPipelineEditorService.Execute("compile_payload", RawArgs(templatePath, payloadPath)).Success);
+            RewritePayloadProfileRefsToTempAssets(payloadPath);
+            Assert.True(MissionPipelineEditorService.Execute("generate_layout", RawArgs(templatePath, payloadPath, layoutPath)).Success);
+            using (var layoutDoc = JsonDocument.Parse(File.ReadAllText(layoutPath)))
+            {
+                var layout = JsonNode.Parse(layoutDoc.RootElement.GetRawText()).AsObject();
+                layout["PortalGraph"]["portals"] = new JsonArray();
+                File.WriteAllText(layoutPath, layout.ToJsonString());
+            }
+
+            Assert.True(MissionPipelineEditorService.Execute("place_entities", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath)).Success);
+
+            var (success, message) = MissionPipelineEditorService.Execute("verify", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath, summaryPath));
+
+            Assert.False(success);
+            using var doc = JsonDocument.Parse(message);
+            var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
+            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "NAV_OBJECTIVE_UNREACHABLE"));
+        }
+
+        private static string RawArgs(string templatePath, string payloadPath = null, string layoutPath = null, string entitiesPath = null, string verificationPath = null)
         {
             var template = ToRepoPath(templatePath);
-            if (payloadPath == null && layoutPath == null && entitiesPath == null)
+            if (payloadPath == null && layoutPath == null && entitiesPath == null && verificationPath == null)
             {
                 return "{ \"templatePath\": \"" + template + "\" }";
             }
@@ -295,7 +392,43 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
                 json += ", \"entitiesPath\": \"" + ToRepoPath(entitiesPath) + "\"";
             }
 
+            if (verificationPath != null)
+            {
+                json += ", \"verificationPath\": \"" + ToRepoPath(verificationPath) + "\"";
+            }
+
             return json + " }";
+        }
+
+        private void RewritePayloadProfileRefsToTempAssets(string payloadPath)
+        {
+            var profileRoot = Path.Combine(_testRoot, "Profiles");
+            Directory.CreateDirectory(profileRoot);
+            var refs = new[]
+            {
+                ("tacticalThemeProfile", "TacticalThemeProfile.asset"),
+                ("performanceProfile", "PerformanceProfile.asset"),
+                ("renderProfile", "RenderProfile.asset"),
+                ("navigationPolicy", "NavigationPolicy.asset"),
+                ("tacticalDensityProfile", "TacticalDensityProfile.asset"),
+                ("addressablesCatalogProfile", "AddressablesCatalogProfile.asset")
+            };
+
+            using var payloadDoc = JsonDocument.Parse(File.ReadAllText(payloadPath));
+            var payload = JsonNode.Parse(payloadDoc.RootElement.GetRawText()).AsObject();
+            var profileRefs = payload["profileRefs"].AsObject();
+            foreach (var (key, name) in refs)
+            {
+                var path = Path.Combine(profileRoot, name);
+                if (!File.Exists(path))
+                {
+                    File.WriteAllText(path, "%YAML 1.1\n");
+                }
+
+                profileRefs[key] = ToRepoPath(path);
+            }
+
+            File.WriteAllText(payloadPath, payload.ToJsonString());
         }
 
         private static string ValidTemplate(string missionId)

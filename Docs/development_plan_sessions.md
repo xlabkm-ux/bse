@@ -21,11 +21,11 @@ Completed:
 - `place_entities` remains blocked by `ORDER_VIOLATION_NO_LAYOUT_GRAPH` until layout exists
 - `place_entities` writes deterministic actor/objective placement after current layout validation
 - generated placement entities carry stable ownership metadata, `roomId`, `navNodeId`, and `layoutRevisionId`
+- `verify` writes `verification_summary.json` with structured findings and metrics
 - Unity editor compilation was verified against the embedded package
 
 Pending:
 
-- `verify`
 - `write_manifest`
 - retry policy
 - generation locks
@@ -136,6 +136,10 @@ Recommended handoff note:
 Goal:
 
 - implement `manage_mission(action="verify")`
+
+Status:
+
+- completed
 
 Work:
 

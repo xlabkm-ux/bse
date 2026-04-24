@@ -790,6 +790,228 @@ namespace BreachScenarioEngine.Mcp.Editor
             }
         }
 
+        private static JsonObject? ReadJsonObject(string path)
+        {
+            if (!File.Exists(path))
+            {
+                return null;
+            }
+
+            try
+            {
+                return JsonNode.Parse(File.ReadAllText(path)) as JsonObject;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static JsonObject EmptyVerificationMetrics()
+        {
+            return new JsonObject
+            {
+                ["enemyCount"] = 0,
+                ["roomCount"] = 0,
+                ["emptyRoomCount"] = 0,
+                ["light2DCount"] = 0,
+                ["activeHearingChecks"] = 0,
+                ["visibilityRayCount"] = 0,
+                ["unreachableCriticalNodes"] = 0,
+                ["actorCount"] = 0,
+                ["objectiveCount"] = 0,
+                ["coverPointCount"] = 0
+            };
+        }
+
+        private static JsonObject ComputeVerificationMetrics(JsonObject layoutNode, JsonObject entitiesNode, List<JsonObject> findings)
+        {
+            var rooms = LayoutRooms(layoutNode);
+            var roomIds = rooms.Select(r => r["id"]?.GetValue<string>() ?? "").Where(id => !string.IsNullOrWhiteSpace(id)).ToHashSet(StringComparer.Ordinal);
+            var reachableRooms = ReachableRooms(layoutNode, roomIds);
+            var actors = (entitiesNode["actors"] as JsonArray)?.OfType<JsonObject>().ToList() ?? new List<JsonObject>();
+            var objectives = (entitiesNode["objectives"] as JsonArray)?.OfType<JsonObject>().ToList() ?? new List<JsonObject>();
+            var occupiedRooms = new HashSet<string>(StringComparer.Ordinal);
+            var unreachableCriticalNodes = 0;
+
+            foreach (var entity in actors.Concat(objectives))
+            {
+                var roomId = entity["roomId"]?.GetValue<string>() ?? "";
+                if (!string.IsNullOrWhiteSpace(roomId))
+                {
+                    occupiedRooms.Add(roomId);
+                }
+
+                if (string.IsNullOrWhiteSpace(roomId) || !roomIds.Contains(roomId) || !reachableRooms.Contains(roomId))
+                {
+                    unreachableCriticalNodes++;
+                    var code = string.Equals(entity["kind"]?.GetValue<string>(), "objective", StringComparison.Ordinal)
+                        ? "NAV_OBJECTIVE_UNREACHABLE"
+                        : "NAV_ENTITY_UNREACHABLE";
+                    findings.Add(Finding("error", code, $"Generated entity is not reachable from the breach entry: {entity["entityId"]?.GetValue<string>() ?? "(unknown)"}"));
+                }
+            }
+
+            var entryRoomId = layoutNode["LayoutGraph"]?["entryRoomId"]?.GetValue<string>() ?? "";
+            if (string.IsNullOrWhiteSpace(entryRoomId) || !roomIds.Contains(entryRoomId))
+            {
+                unreachableCriticalNodes++;
+                findings.Add(Finding("error", "NAV_BREACHPOINT_UNREACHABLE", "LayoutGraph entryRoomId is missing from RoomGraph"));
+            }
+
+            var enemyCount = actors.Count(a =>
+            {
+                var type = a["type"]?.GetValue<string>() ?? "";
+                return type.Contains("Enemy", StringComparison.OrdinalIgnoreCase) ||
+                       type.Contains("Sentry", StringComparison.OrdinalIgnoreCase) ||
+                       type.Contains("Roamer", StringComparison.OrdinalIgnoreCase);
+            });
+            var coverPointCount = (layoutNode["CoverGraph"]?["coverPoints"] as JsonArray)?.Count ?? 0;
+            var activeHearingChecks = (layoutNode["HearingGraph"]?["edges"] as JsonArray)?.Count ?? 0;
+            var visibilityRayCount = (layoutNode["VisibilityGraph"]?["edges"] as JsonArray)?.Count ?? 0;
+
+            if (rooms.Count > 0 && actors.Count > rooms.Count * 6)
+            {
+                findings.Add(Finding("error", "TACTICAL_DENSITY_IMPOSSIBLE_BUDGET", "Actor density exceeds the verification budget of six actors per room"));
+            }
+
+            if (enemyCount > 0 && coverPointCount < enemyCount)
+            {
+                findings.Add(Finding("error", "TACTICAL_DENSITY_IMPOSSIBLE_BUDGET", "Enemy count exceeds available cover points"));
+            }
+
+            if (activeHearingChecks > 64)
+            {
+                findings.Add(Finding("error", "TB-AUD-003", "Active hearing edge count exceeds the verification budget"));
+            }
+
+            if (visibilityRayCount > 128)
+            {
+                findings.Add(Finding("error", "PERFORMANCE_BUDGET_EXCEEDED", "Visibility ray count exceeds the verification budget"));
+            }
+
+            var metrics = EmptyVerificationMetrics();
+            metrics["enemyCount"] = enemyCount;
+            metrics["roomCount"] = rooms.Count;
+            metrics["emptyRoomCount"] = rooms.Count(room => !occupiedRooms.Contains(room["id"]?.GetValue<string>() ?? ""));
+            metrics["light2DCount"] = CountLight2DObjects();
+            metrics["activeHearingChecks"] = activeHearingChecks;
+            metrics["visibilityRayCount"] = visibilityRayCount;
+            metrics["unreachableCriticalNodes"] = unreachableCriticalNodes;
+            metrics["actorCount"] = actors.Count;
+            metrics["objectiveCount"] = objectives.Count;
+            metrics["coverPointCount"] = coverPointCount;
+            return metrics;
+        }
+
+        private static HashSet<string> ReachableRooms(JsonObject layoutNode, HashSet<string> roomIds)
+        {
+            var reachable = new HashSet<string>(StringComparer.Ordinal);
+            var entryRoomId = layoutNode["LayoutGraph"]?["entryRoomId"]?.GetValue<string>() ?? "";
+            if (string.IsNullOrWhiteSpace(entryRoomId) || !roomIds.Contains(entryRoomId))
+            {
+                return reachable;
+            }
+
+            var adjacency = roomIds.ToDictionary(id => id, _ => new List<string>(), StringComparer.Ordinal);
+            var portals = layoutNode["PortalGraph"]?["portals"] as JsonArray;
+            foreach (var portal in portals?.OfType<JsonObject>() ?? Enumerable.Empty<JsonObject>())
+            {
+                var from = portal["fromRoomId"]?.GetValue<string>() ?? "";
+                var to = portal["toRoomId"]?.GetValue<string>() ?? "";
+                if (adjacency.ContainsKey(from) && adjacency.ContainsKey(to))
+                {
+                    adjacency[from].Add(to);
+                    adjacency[to].Add(from);
+                }
+            }
+
+            var queue = new Queue<string>();
+            queue.Enqueue(entryRoomId);
+            reachable.Add(entryRoomId);
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+                foreach (var next in adjacency[current])
+                {
+                    if (reachable.Add(next))
+                    {
+                        queue.Enqueue(next);
+                    }
+                }
+            }
+
+            return reachable;
+        }
+
+        private static void ValidateProfileRefs(JsonObject payloadNode, List<JsonObject> findings)
+        {
+            if (payloadNode["profileRefs"] is not JsonObject profileRefs)
+            {
+                findings.Add(Finding("error", "PROFILE_REFS_MISSING", "Payload is missing profileRefs"));
+                return;
+            }
+
+            var required = new[]
+            {
+                "tacticalThemeProfile",
+                "performanceProfile",
+                "renderProfile",
+                "navigationPolicy",
+                "tacticalDensityProfile",
+                "addressablesCatalogProfile"
+            };
+
+            foreach (var key in required)
+            {
+                var assetPath = profileRefs[key]?.GetValue<string>() ?? "";
+                if (string.IsNullOrWhiteSpace(assetPath))
+                {
+                    findings.Add(Finding("error", "PROFILE_REF_MISSING", $"Payload profileRefs.{key} is missing"));
+                    continue;
+                }
+
+                var absolutePath = ToAbsoluteProjectPath(assetPath);
+                if (!IsUnderProjectRoot(absolutePath) || (!File.Exists(absolutePath) && AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) == null))
+                {
+                    findings.Add(Finding("error", "PROFILE_REF_MISSING", $"Profile reference does not resolve: {assetPath}", assetPath));
+                }
+            }
+        }
+
+        private static int CountLight2DObjects()
+        {
+            var light2DType = Type.GetType("UnityEngine.Rendering.Universal.Light2D, Unity.RenderPipelines.Universal.Runtime");
+            if (light2DType == null)
+            {
+                return 0;
+            }
+
+            return Resources.FindObjectsOfTypeAll(light2DType)
+                .Count(obj => !EditorUtility.IsPersistent(obj));
+        }
+
+        private static JsonObject BuildVerificationSummaryNode(
+            string missionId,
+            string status,
+            string layoutRevisionId,
+            IEnumerable<string> artifacts,
+            IEnumerable<JsonObject> findings,
+            JsonObject metrics)
+        {
+            return new JsonObject
+            {
+                ["schemaVersion"] = "bse.verification_summary.v2.2",
+                ["pipelineVersion"] = PipelineVersion,
+                ["missionId"] = missionId,
+                ["status"] = status,
+                ["layoutRevisionId"] = layoutRevisionId,
+                ["artifacts"] = new JsonArray(artifacts.Select(a => (JsonNode?)a).ToArray()),
+                ["findings"] = FindingsArray(findings),
+                ["metrics"] = (JsonObject)metrics.DeepClone()
+            };
+        }
+
         private static List<JsonObject> ValidatePayloadShape(JsonObject payload)
         {
             var findings = new List<JsonObject>();

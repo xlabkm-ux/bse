@@ -409,9 +409,10 @@ Confirmed weak areas:
   - `place_entities` now fails with `ORDER_VIOLATION_NO_LAYOUT_GRAPH` until a current layout exists
   - `place_entities` writes deterministic `mission_entities.generated.json` actor/objective placement after validating the current `layoutRevisionId`
   - generated placement entities carry stable ownership metadata plus `roomId`, `navNodeId`, and `layoutRevisionId`
+  - `verify` writes `verification_summary.json` with structured findings and metrics for reachability, tactical density, performance budgets, and profile references
   - bridge responses preserve the shared mission result envelope with `status`, `artifacts`, and `findings`
   - template validation findings stay on the `TPL_*` code family
-  - verification, retry execution, and manifest writing remain pending
+  - retry execution and manifest writing remain pending
 
 ## Recommended Delivery Waves
 
