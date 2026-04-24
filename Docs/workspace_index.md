@@ -9,7 +9,6 @@ Short map of the main working areas in the Breach Scenario Engine repository.
 | [dotnet-prototype/tests](../dotnet-prototype/tests) | Server-side tests |
 | [dotnet-prototype/contracts](../dotnet-prototype/contracts) | Tool contract schema |
 | [Docs/](.) | Active and project documentation |
-| [mcp/](../mcp) | Prompts, policies, resources, and validators |
 | [UserMissionSources/missions](../UserMissionSources/missions) | User-authored mission templates |
 | [Assets/Data/Mission/Profiles](../Assets/Data/Mission/Profiles) | Global mission profile defaults |
 
@@ -18,7 +17,6 @@ Short map of the main working areas in the Breach Scenario Engine repository.
 1. Start in [README.md](../README.md).
 2. Use [Docs/index.md](index.md) for active doc navigation.
 3. Use this page to jump to the code area you need.
-4. Use [mcp/index.md](../mcp/index.md) when you need workflow assets.
 
 ## Where to work
 
@@ -28,4 +26,4 @@ Short map of the main working areas in the Breach Scenario Engine repository.
 - Mission authoring inputs: `UserMissionSources/missions`
 - Mission profile defaults: `Assets/Data/Mission/Profiles`
 - Validation and runtime checks: `dotnet-prototype/tests`
-- Human-facing guidance: `Docs/` and `mcp/`
+- Human-facing guidance: `Docs/`

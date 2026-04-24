@@ -12,10 +12,8 @@ Short entry point for the active Breach Scenario Engine MCP documentation.
 | [mission_data_contract_v2.2.md](mission_data_contract_v2.2.md) | JSON Schema contract for generated mission payloads |
 | [generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md) | Replay, seed, artifact, and verification manifest contract |
 | [development_plan_sessions.md](development_plan_sessions.md) | Session-split plan for handing the work across chats |
-| [canonical_tools.md](canonical_tools.md) | Target tool and resource contract |
+| [canonical_tools.md](canonical_tools.md) | Current project MCP tool contract |
 | [runtime_tools.md](runtime_tools.md) | Actual tools exposed by the current runtime |
-| [breach_mcp_verification_contract.md](breach_mcp_verification_contract.md) | Required verification payloads and resources |
-| [breach_mcp_server_backlog.md](breach_mcp_server_backlog.md) | Remaining server tasks and status |
 | [Archive/README.md](Archive/README.md) | Archive index |
 
 ## Quick use
@@ -26,5 +24,4 @@ Short entry point for the active Breach Scenario Engine MCP documentation.
 4. Read [mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md) before editing mission YAML.
 5. Read [mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md) before implementing generation code.
 6. Read [mission_data_contract_v2.2.md](mission_data_contract_v2.2.md) and [generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md) for runtime artifacts.
-7. Use [breach_mcp_verification_contract.md](breach_mcp_verification_contract.md) when validating bridge behavior.
-8. Track remaining work in [breach_mcp_server_backlog.md](breach_mcp_server_backlog.md).
+7. Track remaining work in [development_plan_sessions.md](development_plan_sessions.md).

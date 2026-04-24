@@ -1,6 +1,6 @@
 # Active Docs
 
-Server-side planning and verification docs for the Breach Scenario Engine MCP stack.
+Active project documentation for the Breach Scenario Engine mission pipeline.
 
 ## Active docs
 
@@ -15,8 +15,6 @@ Server-side planning and verification docs for the Breach Scenario Engine MCP st
 - [generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md)
 - [canonical_tools.md](canonical_tools.md)
 - [runtime_tools.md](runtime_tools.md)
-- [breach_mcp_server_backlog.md](breach_mcp_server_backlog.md)
-- [breach_mcp_verification_contract.md](breach_mcp_verification_contract.md)
 - [development_plan_sessions.md](development_plan_sessions.md)
 - [Archive](Archive/README.md)
 

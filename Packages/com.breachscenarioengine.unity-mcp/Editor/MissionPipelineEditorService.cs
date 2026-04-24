@@ -383,18 +383,14 @@ namespace BreachScenarioEngine.Mcp.Editor
                 return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
             }
 
-            var lockPath = manifestPath + ".lock";
-            FileStream? lockStream = null;
-            var lockAcquired = false;
-            try
+            if (!GenerationLockSet.TryAcquire(template.MissionId, missionDir, manifestPath, out var generationLocks, out var conflictPath))
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
-                lockStream = new FileStream(lockPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                lockAcquired = true;
-                var lockBytes = Encoding.UTF8.GetBytes($"bse-pipeline {DateTime.UtcNow:O}");
-                lockStream.Write(lockBytes, 0, lockBytes.Length);
-                lockStream.Flush();
+                findings.Add(Finding("error", "GENERATION_LOCK_CONFLICT", "Another mission generation writer holds a required generation lock", ToRepoPath(conflictPath!)));
+                return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+            }
 
+            using (generationLocks!)
+            {
                 var payloadNode = ReadJsonObject(payloadPath);
                 if (payloadNode == null)
                 {
@@ -414,19 +410,6 @@ namespace BreachScenarioEngine.Mcp.Editor
                 AssetDatabase.Refresh();
 
                 return (true, MissionResultJson("PASS", template.MissionId, artifacts, findings));
-            }
-            catch (IOException)
-            {
-                findings.Add(Finding("error", "GENERATION_LOCK_CONFLICT", "Another mission generation writer holds the manifest lock", ToRepoPath(lockPath)));
-                return (false, MissionResultJson("FAIL", template!.MissionId, artifacts, findings));
-            }
-            finally
-            {
-                lockStream?.Dispose();
-                if (lockAcquired)
-                {
-                    TryDeleteFile(lockPath);
-                }
             }
         }
 
@@ -1280,21 +1263,92 @@ namespace BreachScenarioEngine.Mcp.Editor
         private static List<JsonObject> ValidatePayloadShape(JsonObject payload)
         {
             var findings = new List<JsonObject>();
-            RequiredPayloadObject(payload, "header", findings);
-            RequiredPayloadObject(payload, "spatial", findings);
-            RequiredPayloadObject(payload, "logic", findings);
+            RequireAllowedKeys(payload, "payload", new[] { "header", "spatial", "logic", "roster", "objectives", "profileRefs" }, findings);
+            var header = RequiredPayloadObject(payload, "header", findings);
+            var spatial = RequiredPayloadObject(payload, "spatial", findings);
+            var logic = RequiredPayloadObject(payload, "logic", findings);
             RequiredPayloadArray(payload, "roster", findings);
-            RequiredPayloadObject(payload, "objectives", findings);
-            RequiredPayloadObject(payload, "profileRefs", findings);
+            var objectives = RequiredPayloadObject(payload, "objectives", findings);
+            var profileRefs = RequiredPayloadObject(payload, "profileRefs", findings);
+
+            if (header != null)
+            {
+                RequireAllowedKeys(header, "header", new[] { "schemaVersion", "pipelineVersion", "missionId", "missionTitle", "initialSeed", "effectiveSeed", "layoutRevisionId" }, findings);
+                RequiredPayloadString(header, "schemaVersion", PayloadSchemaVersion, findings);
+                RequiredPayloadString(header, "pipelineVersion", PipelineVersion, findings);
+                RequiredPayloadString(header, "missionId", null, findings);
+                RequiredPayloadInteger(header, "initialSeed", 0, findings);
+                RequiredPayloadInteger(header, "effectiveSeed", 0, findings);
+            }
+
+            if (spatial != null)
+            {
+                RequireAllowedKeys(spatial, "spatial", new[] { "bounds", "theme", "ppu", "bsp" }, findings);
+                RequiredPayloadArray(spatial, "bounds", findings);
+                RequiredPayloadString(spatial, "theme", null, findings);
+                RequiredPayloadInteger(spatial, "ppu", 1, findings);
+                var bsp = RequiredPayloadObject(spatial, "bsp", findings);
+                if (bsp != null)
+                {
+                    RequireAllowedKeys(bsp, "spatial.bsp", new[] { "minRoomSize", "maxRoomSize", "corridorWidth", "forceAdjacency" }, findings);
+                    RequiredPayloadArray(bsp, "minRoomSize", findings);
+                    RequiredPayloadArray(bsp, "maxRoomSize", findings);
+                    RequiredPayloadInteger(bsp, "corridorWidth", 1, findings);
+                    RequiredPayloadBoolean(bsp, "forceAdjacency", findings);
+                }
+            }
+
+            if (logic != null)
+            {
+                RequireAllowedKeys(logic, "logic", new[] { "noise", "navigation" }, findings);
+                var noise = RequiredPayloadObject(logic, "noise", findings);
+                var navigation = RequiredPayloadObject(logic, "navigation", findings);
+                if (noise != null)
+                {
+                    RequireAllowedKeys(noise, "logic.noise", new[] { "threshold", "wallMultiplier", "doorPenalty" }, findings);
+                    RequiredPayloadNumber(noise, "threshold", findings);
+                    RequiredPayloadNumber(noise, "wallMultiplier", findings);
+                    RequiredPayloadNumber(noise, "doorPenalty", findings);
+                }
+
+                if (navigation != null)
+                {
+                    RequireAllowedKeys(navigation, "logic.navigation", new[] { "strict" }, findings);
+                    RequiredPayloadBoolean(navigation, "strict", findings);
+                }
+            }
+
+            if (objectives != null)
+            {
+                RequireAllowedKeys(objectives, "objectives", new[] { "primary", "secondary" }, findings);
+                RequiredPayloadArray(objectives, "primary", findings);
+            }
+
+            if (profileRefs != null)
+            {
+                RequireAllowedKeys(profileRefs, "profileRefs", new[]
+                {
+                    "tacticalThemeProfile",
+                    "performanceProfile",
+                    "renderProfile",
+                    "navigationPolicy",
+                    "tacticalDensityProfile",
+                    "addressablesCatalogProfile"
+                }, findings);
+            }
+
             return findings;
         }
 
-        private static void RequiredPayloadObject(JsonObject obj, string key, List<JsonObject> findings)
+        private static JsonObject? RequiredPayloadObject(JsonObject obj, string key, List<JsonObject> findings)
         {
             if (obj[key] is not JsonObject)
             {
                 findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload missing object: {key}"));
+                return null;
             }
+
+            return (JsonObject)obj[key]!;
         }
 
         private static void RequiredPayloadArray(JsonObject obj, string key, List<JsonObject> findings)
@@ -1302,6 +1356,56 @@ namespace BreachScenarioEngine.Mcp.Editor
             if (obj[key] is not JsonArray)
             {
                 findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload missing array: {key}"));
+            }
+        }
+
+        private static void RequiredPayloadString(JsonObject obj, string key, string? expected, List<JsonObject> findings)
+        {
+            if (obj[key] is not JsonValue value || !value.TryGetValue<string>(out var text) || string.IsNullOrWhiteSpace(text))
+            {
+                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload missing string: {key}"));
+                return;
+            }
+
+            if (expected != null && !string.Equals(text, expected, StringComparison.Ordinal))
+            {
+                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload {key} must be {expected}"));
+            }
+        }
+
+        private static void RequiredPayloadInteger(JsonObject obj, string key, int minimum, List<JsonObject> findings)
+        {
+            if (obj[key] is not JsonValue value || !value.TryGetValue<int>(out var number) || number < minimum)
+            {
+                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload {key} must be an integer >= {minimum}"));
+            }
+        }
+
+        private static void RequiredPayloadNumber(JsonObject obj, string key, List<JsonObject> findings)
+        {
+            if (obj[key] is not JsonValue value || !value.TryGetValue<double>(out _))
+            {
+                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload {key} must be a number"));
+            }
+        }
+
+        private static void RequiredPayloadBoolean(JsonObject obj, string key, List<JsonObject> findings)
+        {
+            if (obj[key] is not JsonValue value || !value.TryGetValue<bool>(out _))
+            {
+                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload {key} must be a boolean"));
+            }
+        }
+
+        private static void RequireAllowedKeys(JsonObject obj, string path, IEnumerable<string> allowed, List<JsonObject> findings)
+        {
+            var allowedSet = new HashSet<string>(allowed, StringComparer.Ordinal);
+            foreach (var key in obj.Select(pair => pair.Key))
+            {
+                if (!allowedSet.Contains(key))
+                {
+                    findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload has unknown field: {path}.{key}"));
+                }
             }
         }
 
@@ -1435,6 +1539,77 @@ namespace BreachScenarioEngine.Mcp.Editor
             }
             catch
             {
+            }
+        }
+
+        private static string GenerationLockRoot(string missionId)
+        {
+            return Path.Combine(ProjectRoot(), "Temp", "BseGenerationLocks", SafeLockName(missionId));
+        }
+
+        private static string SafeLockName(string value)
+        {
+            var safe = new string(value.Select(c => char.IsLetterOrDigit(c) || c == '_' || c == '-' ? c : '_').ToArray());
+            return string.IsNullOrWhiteSpace(safe) ? "unknown_mission" : safe;
+        }
+
+        private static IReadOnlyList<(string Resource, string Path)> GenerationLockPaths(string missionId, string manifestPath)
+        {
+            var root = GenerationLockRoot(missionId);
+            return new[]
+            {
+                ("mission id", Path.Combine(root, "mission.lock")),
+                ("MissionConfig asset", Path.Combine(root, "mission_config_asset.lock")),
+                ("generated scene root", Path.Combine(root, "generated_scene_root.lock")),
+                ("manifest file", manifestPath + ".lock")
+            };
+        }
+
+        private sealed class GenerationLockSet : IDisposable
+        {
+            private readonly List<(FileStream Stream, string Path)> _locks = new();
+
+            private GenerationLockSet()
+            {
+            }
+
+            public static bool TryAcquire(string missionId, string missionDir, string manifestPath, out GenerationLockSet? lockSet, out string? conflictPath)
+            {
+                lockSet = new GenerationLockSet();
+                conflictPath = null;
+
+                foreach (var (resource, path) in GenerationLockPaths(missionId, manifestPath))
+                {
+                    try
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                        var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                        var body = Encoding.UTF8.GetBytes($"bse-pipeline {DateTime.UtcNow:O} {resource} {ToRepoPath(missionDir)}");
+                        stream.Write(body, 0, body.Length);
+                        stream.Flush();
+                        lockSet._locks.Add((stream, path));
+                    }
+                    catch (IOException)
+                    {
+                        conflictPath = path;
+                        lockSet.Dispose();
+                        lockSet = null;
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            public void Dispose()
+            {
+                foreach (var (stream, path) in _locks)
+                {
+                    stream.Dispose();
+                    TryDeleteFile(path);
+                }
+
+                _locks.Clear();
             }
         }
 
@@ -1611,7 +1786,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                         currentObjective = null;
                         if (!new[] { "generationMeta", "spatialConstraints", "tacticalRules", "actorRoster", "objectives" }.Contains(section, StringComparer.Ordinal))
                         {
-                            findings.Add(Finding("warning", "TPL_UNKNOWN_TOP_LEVEL_FIELD", $"Unknown top-level section: {section}", pathPrefix));
+                            findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown top-level section: {section}", pathPrefix));
                         }
                         continue;
                     }
@@ -1638,7 +1813,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                             objectiveSection = subsection;
                             if (objectiveSection != "primary" && objectiveSection != "secondary")
                             {
-                                findings.Add(Finding("warning", "TPL_UNKNOWN_OBJECTIVE_SECTION", $"Unknown objectives section: {objectiveSection}", pathPrefix));
+                                findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown objectives section: {objectiveSection}", pathPrefix));
                             }
                         }
                         continue;
@@ -1704,7 +1879,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                     case "schemaVersion": template.SchemaVersion = template.MarkedString(value, "schemaVersion", findings, path); break;
                     case "missionId": template.MissionId = template.MarkedString(value, "missionId", findings, path); break;
                     case "missionTitle": template.MissionTitle = template.MarkedString(value, "missionTitle", findings, path); break;
-                    default: findings.Add(Finding("warning", "TPL_UNKNOWN_TOP_LEVEL_FIELD", $"Unknown top-level field: {key}", path)); break;
+                    default: findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown top-level field: {key}", path)); break;
                 }
             }
 
@@ -1718,7 +1893,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                         else if (key == "effectiveSeed") template.EffectiveSeed = template.MarkedInt(value, "generationMeta.effectiveSeed", findings, path);
                         else if (key == "generationTimeout") template.GenerationTimeout = template.MarkedInt(value, "generationMeta.generationTimeout", findings, path);
                         else if (key == "maxRetries") template.MaxRetries = template.MarkedInt(value, "generationMeta.maxRetries", findings, path);
-                        else findings.Add(Finding("warning", "TPL_UNKNOWN_FIELD", $"Unknown generationMeta field: {key}", path));
+                        else findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown generationMeta field: {key}", path));
                         break;
                     case "spatialConstraints":
                         if (key == "worldBounds") template.WorldBounds = template.MarkedIntList(value, "spatialConstraints.worldBounds", findings, path);
@@ -1728,7 +1903,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                         else if (subsection == "bspConstraints" && key == "maxRoomSize") template.MaxRoomSize = template.MarkedIntList(value, "spatialConstraints.bspConstraints.maxRoomSize", findings, path);
                         else if (subsection == "bspConstraints" && key == "corridorWidth") template.CorridorWidth = template.MarkedInt(value, "spatialConstraints.bspConstraints.corridorWidth", findings, path);
                         else if (subsection == "bspConstraints" && key == "forceRoomAdjacency") template.ForceRoomAdjacency = template.MarkedBool(value, "spatialConstraints.bspConstraints.forceRoomAdjacency", findings, path);
-                        else findings.Add(Finding("warning", "TPL_UNKNOWN_FIELD", $"Unknown spatialConstraints field: {key}", path));
+                        else findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown spatialConstraints field: {key}", path));
                         break;
                     case "tacticalRules":
                         if (key == "noiseAlertThreshold") template.NoiseAlertThreshold = template.MarkedDouble(value, "tacticalRules.noiseAlertThreshold", findings, path);
@@ -1736,10 +1911,10 @@ namespace BreachScenarioEngine.Mcp.Editor
                         else if (key == "enforcePostLayoutPlacement") template.EnforcePostLayoutPlacement = template.MarkedBool(value, "tacticalRules.enforcePostLayoutPlacement", findings, path);
                         else if (subsection == "acousticOcclusion" && key == "wallMultiplier") template.WallMultiplier = template.MarkedDouble(value, "tacticalRules.acousticOcclusion.wallMultiplier", findings, path);
                         else if (subsection == "acousticOcclusion" && key == "doorPenalty") template.DoorPenalty = template.MarkedDouble(value, "tacticalRules.acousticOcclusion.doorPenalty", findings, path);
-                        else findings.Add(Finding("warning", "TPL_UNKNOWN_FIELD", $"Unknown tacticalRules field: {key}", path));
+                        else findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown tacticalRules field: {key}", path));
                         break;
                     default:
-                        findings.Add(Finding("warning", "TPL_UNKNOWN_FIELD", $"Field is not in a known section: {key}", path));
+                        findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Field is not in a known section: {key}", path));
                         break;
                 }
             }
@@ -1754,7 +1929,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                     case "countRange": actor.CountRange = ParseIntList(value, "actorRoster[].countRange", findings, path); break;
                     case "navigationPolicy": actor.NavigationPolicy = ParseString(value, "actorRoster[].navigationPolicy", findings, path); break;
                     case "placementPolicy": actor.PlacementPolicy = ParseString(value, "actorRoster[].placementPolicy", findings, path); break;
-                    default: findings.Add(Finding("warning", "TPL_UNKNOWN_ACTOR_FIELD", $"Unknown actor field: {key}", path)); break;
+                    default: findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown actor field: {key}", path)); break;
                 }
             }
 
@@ -1768,7 +1943,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                     case "requiresLayoutGraph": objective.RequiresLayoutGraph = ParseBool(value, "objectives[].requiresLayoutGraph", findings, path); break;
                     case "targetRoomTag": objective.TargetRoomTag = ParseString(value, "objectives[].targetRoomTag", findings, path); break;
                     case "optional": objective.Optional = ParseBool(value, "objectives[].optional", findings, path); break;
-                    default: findings.Add(Finding("warning", "TPL_UNKNOWN_OBJECTIVE_FIELD", $"Unknown objective field: {key}", path)); break;
+                    default: findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown objective field: {key}", path)); break;
                 }
             }
 
@@ -1844,6 +2019,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ValidateActors(template.Actors, findings);
                 ValidateObjectives(template.PrimaryObjectives, "objectives.primary", findings);
                 ValidateObjectives(template.SecondaryObjectives, "objectives.secondary", findings);
+                ValidateObjectiveReferences(template, findings);
             }
 
             private static void ValidateActors(IEnumerable<MissionActor> actors, List<JsonObject> findings)
@@ -1896,6 +2072,30 @@ namespace BreachScenarioEngine.Mcp.Editor
                     if (objective.RequiresLayoutGraph == true && string.IsNullOrWhiteSpace(objective.TargetRoomTag))
                     {
                         findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", $"{objective.Id} requires a targetRoomTag when requiresLayoutGraph is true"));
+                    }
+                }
+            }
+
+            private static void ValidateObjectiveReferences(MissionTemplateModel template, List<JsonObject> findings)
+            {
+                var knownRoomTags = new HashSet<string>(StringComparer.Ordinal)
+                {
+                    "entry",
+                    "living_area",
+                    "hallway",
+                    "security_vault"
+                };
+                var ids = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var objective in template.PrimaryObjectives.Concat(template.SecondaryObjectives))
+                {
+                    if (!string.IsNullOrWhiteSpace(objective.Id) && !ids.Add(objective.Id))
+                    {
+                        findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", $"Duplicate objective id across objective sections: {objective.Id}"));
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(objective.TargetRoomTag) && !knownRoomTags.Contains(objective.TargetRoomTag))
+                    {
+                        findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", $"Unknown objective targetRoomTag: {objective.TargetRoomTag}"));
                     }
                 }
             }

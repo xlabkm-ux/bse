@@ -3,252 +3,98 @@
 Date: 2026-04-07
 Project: `Breach Scenario Engine`
 
-This document is the single map for the project documentation set.
-It explains what each document covers, how to read it, and how the runtime
-and server-side workflow are supposed to be used.
+This document is the map for the active documentation set. It intentionally
+tracks only the current Breach Scenario Engine mission pipeline. Imported Unity
+MCP backlog and generic bridge workflow notes are not part of the active docs.
 
-## 1. Documentation Set
+## 1. Active Documentation Set
 
-### Core entry points
+### Entry points
 
 - [README.md](../README.md)
   - Project landing page
-  - High-level orientation
-  - Links to docs and workflow entry points
+  - Repository layout and mission workflow
 
 - [Docs/README.md](README.md)
-  - Index of the active documentation
-  - Read-first map for server-side work
+  - Short active-docs list
+
+- [Docs/index.md](index.md)
+  - Navigation table and reading order
+
+- [Docs/workspace_index.md](workspace_index.md)
+  - Code and data location map
+
+### Current MCP tools
+
+- [Docs/canonical_tools.md](canonical_tools.md)
+  - Source of truth for MCP functionality required by this project
+
+- [Docs/runtime_tools.md](runtime_tools.md)
+  - Public tool names exposed by the current runtime
+
+### Mission pipeline contracts
+
+- [Docs/breach_mcp_architecture_v2.2.md](breach_mcp_architecture_v2.2.md)
+  - Layout-first mission generation architecture
+
+- [Docs/mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md)
+  - User-authored YAML ownership contract
 
 - [Docs/mission_template_v2.2.md](mission_template_v2.2.md)
   - Canonical mission template specification
-  - Source of truth for mission authoring and validation
-
-- [Docs/mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md)
-  - Authoring ownership contract
-  - Separates user-authored YAML from compiler, profile, and manifest fields
-
-- [Docs/breach_mcp_architecture_v2.2.md](breach_mcp_architecture_v2.2.md)
-  - Technical architecture specification
-  - Defines layout-first orchestration, occlusion math, and retry policy
 
 - [Docs/mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md)
-  - Step 0-7 implementation contract
-  - Defines artifacts, retry rules, and target mission MCP actions
+  - `manage_mission(...)` action order, result envelope, retries, and artifacts
 
 - [Docs/mission_data_contract_v2.2.md](mission_data_contract_v2.2.md)
-  - JSON Schema payload contract
-  - Defines the final runtime data shape for Unity DTO parsing
+  - Generated payload shape consumed by Unity
 
 - [Docs/generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md)
-  - Replay and verification manifest contract
-  - Owns `effectiveSeed`, `retrySeeds`, `layoutRevisionId`, and artifact paths
+  - Replay, seed, artifact, and verification manifest contract
 
-- [mcp/README.md](../mcp/README.md)
-  - Index of MCP contracts, prompts, policies, resources, and validators
+### Planning and history
 
-### Canonical contract documents
-
-- [Docs/canonical_tools.md](canonical_tools.md)
-  - Target contract for the tool and resource naming model
-  - Canonical names only
-
-- [Docs/runtime_tools.md](runtime_tools.md)
-  - What the current runtime actually exposes today
-  - Useful for checking drift between code and target contract
-
-- [Docs/breach_mcp_verification_contract.md](breach_mcp_verification_contract.md)
-  - Required resources and tools for verification
-  - Machine-readable expectations for the bridge and server
-
-- [Docs/breach_mcp_server_backlog.md](breach_mcp_server_backlog.md)
-  - Remaining server-side work items
-  - Priorities, dependencies, and completion status
-
-### MCP workflow assets
-
-- [mcp/prompts/](../mcp/prompts)
-  - Reusable prompt templates for safe editing and release checks
-
-- [mcp/policies/](../mcp/policies)
-  - Safety and mutation policies
-
-- [mcp/resources/](../mcp/resources)
-  - Scenario recipes, release matrices, rules, and smoke workflows
-
-- [mcp/validators/](../mcp/validators)
-  - Rule matrix for validating tool and workflow coverage
-
-### Historical archive
+- [Docs/development_plan_sessions.md](development_plan_sessions.md)
+  - Current session plan and handoff checklist
 
 - [Docs/Archive/README.md](Archive/README.md)
+  - Historical notes only
 
 ## 2. Recommended Reading Order
 
 1. [README.md](../README.md)
-2. [Docs/README.md](README.md)
+2. [Docs/index.md](index.md)
 3. [Docs/canonical_tools.md](canonical_tools.md)
 4. [Docs/runtime_tools.md](runtime_tools.md)
 5. [Docs/mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md)
 6. [Docs/mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md)
 7. [Docs/mission_data_contract_v2.2.md](mission_data_contract_v2.2.md)
 8. [Docs/generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md)
-9. [Docs/breach_mcp_verification_contract.md](breach_mcp_verification_contract.md)
-10. [Docs/breach_mcp_server_backlog.md](breach_mcp_server_backlog.md)
-11. [mcp/README.md](../mcp/README.md)
-12. [Docs/Archive/README.md](Archive/README.md)
+9. [Docs/development_plan_sessions.md](development_plan_sessions.md)
 
 ## 3. Runtime Snapshot
 
-The current runtime is target-only and already exposes the operational surface
-needed for verification.
+The current project-required MCP surface is:
 
-### Base project and editor state
+- status and preflight: `project_root.set`, `project.info`,
+  `project.health_check`, `project.capabilities`, `editor.state`,
+  `read_console`, `run_tests`, `get_test_job`
+- mission pipeline: `manage_mission(action="validate_template")`,
+  `compile_payload`, `generate_layout`, `place_entities`, `verify`,
+  `write_manifest`
 
-- `project_root.set`
-- `project.info`
-- `project.health_check`
-- `project.capabilities`
-- `editor.state`
-- `read_console`
+The broader runtime may expose additional Unity bridge tools. Those tools are
+implementation support and should not be treated as Breach Scenario Engine
+requirements unless a task explicitly depends on them.
 
-### Content and Unity editing
+## 4. Maintenance Rules
 
-- `manage_asset`
-- `manage_hierarchy`
-- `manage_scene`
-- `manage_gameobject`
-- `manage_components`
-- `manage_script`
-- `manage_scriptableobject`
-- `manage_prefabs`
-- `manage_graph`
-- `manage_ui`
-- `manage_localization`
-
-### Runtime control and verification
-
-- `manage_editor`
-- `manage_input`
-- `manage_camera`
-- `manage_graphics`
-- `manage_profiler`
-- `manage_build`
-- `run_tests`
-- `get_test_job`
-
-### Diagnostics and safety
-
-- Controlled diagnostics file access is limited to `Library/McpDiagnostics`
-- Health payloads expose heartbeat, queue depth, audit trail, and screenshot
-  indexing status
-- Screenshot artifacts are indexed under `Library/BreachMcpBridge/screenshots`
-- `manage_editor` also owns Unity MCP package lifecycle operations:
-  `install`, `update`, and `delete` for the embedded `Packages/com.breachscenarioengine.unity-mcp` package
-
-## 4. Verification Workflow
-
-Use this order when driving Breach Scenario Engine MCP:
-
-1. Check `project.health_check`.
-2. Read `project.capabilities`.
-3. Read `editor.state`.
-4. Validate scenes and prefabs.
-5. Enter Play Mode and send input if needed.
-6. Run tests and poll `get_test_job`.
-7. Capture screenshots for visual verification.
-8. Check profiler/build/quality information when testing platform behavior.
-9. Use controlled diagnostics file actions only for save/load resilience runs.
-
-## 5. Documentation Composition
-
-The project documentation should stay split by responsibility:
-
-### A. Orientation
-
-- `README.md`
-- `Docs/README.md`
-
-Purpose:
-- explain the repo at a glance
-- provide entry points for humans and agents
-
-### B. Contract
-
-- `Docs/canonical_tools.md`
-- `Docs/runtime_tools.md`
-- `Docs/breach_mcp_verification_contract.md`
-
-Purpose:
-- define what the runtime should do
-- show what it actually does now
-- document the required verification payloads
-
-### C. Delivery state
-
-- `Docs/breach_mcp_server_backlog.md`
-
-Purpose:
-- track what is done and what remains
-- keep the delivery order explicit
-
-### D. Workflow assets
-
-- `mcp/prompts/*`
-- `mcp/policies/*`
-- `mcp/resources/*`
-- `mcp/validators/*`
-- `Docs/breach_mcp_architecture_v2.2.md`
-- `Docs/mission_authoring_contract_v2.2.md`
-- `Docs/mission_pipeline_contract_v2.2.md`
-- `Docs/mission_template_v2.2.md`
-- `Docs/mission_data_contract_v2.2.md`
-- `Docs/generation_manifest_contract_v2.2.md`
-
-Purpose:
-- capture reusable recipes, guardrails, and release checks
-- define the current pipeline and mission template contracts
-- define the payload contract consumed by Unity
-- define the manifest contract used for deterministic replay
-
-### E. History
-
-- `Docs/Archive/*`
-
-Purpose:
-- preserve old prototype notes without mixing them into active guidance
-
-## 6. Status of MCP Server Work
-
-The imported MCP bridge/server baseline is complete:
-
-- `BSE-001` to `BSE-021` are marked `completed`
-- the active runtime inventory is target-only
-- the bridge includes capability, health, audit, diagnostics, screenshot
-  indexing, localization validation, build, profiler, save, schema
-  validation, quality-profile validation, change-risk workflows, and
-  server-side Unity MCP package lifecycle management
-
-Mission pipeline implementation is not complete yet. The target surface is
-documented in [mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md)
-as `manage_mission(...)`.
-
-## 7. Maintenance Rules
-
-1. Keep active docs in `Docs/`.
-2. Keep reusable prompt and workflow assets in `mcp/`.
-3. Move obsolete notes into `Docs/Archive/` instead of deleting history.
-4. Keep `canonical_tools.md` and `runtime_tools.md` in sync with the code.
-5. Update `breach_mcp_server_backlog.md` when implementation status changes.
-6. Update `breach_mcp_verification_contract.md` whenever runtime payload fields
-   change.
-7. Keep `bin/` and `obj/` out of version control.
-
-## 8. Suggested Next Document
-
-If this repo grows further, the next useful document would be a short
-`Docs/verification_runbook.md` that shows:
-
-- the exact command order for a verification session
-- the expected artifacts and where they are written
-- common failure states and the right recovery action
+1. Keep active project docs in `Docs/`.
+2. Keep `canonical_tools.md` limited to MCP functionality required by the
+   current project.
+3. Keep `runtime_tools.md` aligned with the actual runtime inventory.
+4. Use `development_plan_sessions.md` as the active backlog and handoff plan.
+5. Move historical notes to `Docs/Archive/` only when this repo needs to retain
+   them; otherwise prefer removing copied notes that can be found in the source
+   MCP project.
+6. Keep generated artifacts, `bin/`, and `obj/` out of version control.

@@ -90,6 +90,31 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
         }
 
         [Test]
+        public void ValidateTemplate_WithUnknownAuthoringFields_FailsSchemaValidation()
+        {
+            var templatePath = Path.Combine(_testRoot, "unknown-fields.template.yaml");
+            File.WriteAllText(templatePath, ValidTemplate("VS84_UnknownFields") + string.Join("\n", new[]
+            {
+                "unexpectedTopLevel: true",
+                "generationMeta:",
+                "  unsupportedSeedMode: \"random\"",
+                ""
+            }));
+
+            var (success, message) = MissionPipelineEditorService.Execute("validate_template", RawArgs(templatePath));
+
+            Assert.False(success);
+            using var doc = JsonDocument.Parse(message);
+            var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
+            Assert.IsTrue(findings.Any(f =>
+                f.GetProperty("code").GetString() == "TPL_SCHEMA_INVALID" &&
+                f.GetProperty("message").GetString().Contains("Unknown top-level field")));
+            Assert.IsTrue(findings.Any(f =>
+                f.GetProperty("code").GetString() == "TPL_SCHEMA_INVALID" &&
+                f.GetProperty("message").GetString().Contains("Unknown generationMeta field")));
+        }
+
+        [Test]
         public void CompilePayload_ValidTemplate_WritesSchemaAlignedPayload()
         {
             var templatePath = Path.Combine(_testRoot, "valid.template.yaml");

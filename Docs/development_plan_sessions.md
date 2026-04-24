@@ -42,7 +42,7 @@ Goal:
 Work:
 
 - review `Docs/mission_pipeline_contract_v2.2.md`
-- keep `Docs/runtime_tools.md` and `Docs/breach_mcp_server_backlog.md` in sync
+- keep `Docs/runtime_tools.md` and `Docs/canonical_tools.md` in sync
 - tighten the `manage_mission` result shape
 - align template validation errors to contract codes
 
@@ -269,5 +269,4 @@ Before switching chats:
 - [Docs/mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md)
 - [Docs/mission_data_contract_v2.2.md](mission_data_contract_v2.2.md)
 - [Docs/generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md)
-- [Docs/breach_mcp_server_backlog.md](breach_mcp_server_backlog.md)
 - [Docs/runtime_tools.md](runtime_tools.md)
