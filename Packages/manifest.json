@@ -1,4 +1,11 @@
 {
-  "dependencies": {}
+  "dependencies": {
+    "com.unity.multiplayer.center": "1.0.1",
+    "com.unity.test-framework": "1.5.1",
+    "com.unity.modules.adaptiveperformance": "1.0.0",
+    "com.unity.modules.vectorgraphics": "1.0.0"
+  },
+  "testables": [
+    "com.breachscenarioengine.unity-mcp"
+  ]
 }
-

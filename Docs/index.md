@@ -11,6 +11,7 @@ Short entry point for the active Breach Scenario Engine MCP documentation.
 | [mission_template_v2.2.md](mission_template_v2.2.md) | Canonical mission template specification |
 | [mission_data_contract_v2.2.md](mission_data_contract_v2.2.md) | JSON Schema contract for generated mission payloads |
 | [generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md) | Replay, seed, artifact, and verification manifest contract |
+| [development_plan_sessions.md](development_plan_sessions.md) | Session-split plan for handing the work across chats |
 | [canonical_tools.md](canonical_tools.md) | Target tool and resource contract |
 | [runtime_tools.md](runtime_tools.md) | Actual tools exposed by the current runtime |
 | [breach_mcp_verification_contract.md](breach_mcp_verification_contract.md) | Required verification payloads and resources |

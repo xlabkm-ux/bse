@@ -125,6 +125,11 @@ Each action must return a machine-readable result with:
 }
 ```
 
+In the current Unity bridge, that JSON is serialized into the tool result text
+and should be parsed as JSON by the caller. The vertical slice already uses the
+same envelope for `validate_template` and `compile_payload`, with findings coded
+through the `TPL_*` contract family.
+
 ## 8. Acceptance Gate
 
 A mission is accepted only when:

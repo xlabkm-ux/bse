@@ -1,0 +1,27 @@
+{
+  "name": "BreachScenarioEngine.Mcp.Editor.Tests",
+  "rootNamespace": "BreachScenarioEngine.Mcp.Editor.Tests",
+  "references": [
+    "BreachScenarioEngine.Mcp.Editor"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "System.Buffers.dll",
+    "System.Memory.dll",
+    "System.Runtime.CompilerServices.Unsafe.dll",
+    "System.Text.Encodings.Web.dll",
+    "System.Text.Json.dll"
+  ],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "noEngineReferences": false
+}

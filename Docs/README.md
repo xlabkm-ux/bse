@@ -17,5 +17,6 @@ Server-side planning and verification docs for the Breach Scenario Engine MCP st
 - [runtime_tools.md](runtime_tools.md)
 - [breach_mcp_server_backlog.md](breach_mcp_server_backlog.md)
 - [breach_mcp_verification_contract.md](breach_mcp_verification_contract.md)
+- [development_plan_sessions.md](development_plan_sessions.md)
 - [Archive](Archive/README.md)
 

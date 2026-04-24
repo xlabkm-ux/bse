@@ -54,6 +54,7 @@ public sealed class McpRequestDispatcher
         "manage_graphics" => true,
         "manage_profiler" => true,
         "manage_build" => true,
+        "manage_mission" => true,
         "run_tests" => true,
         "get_test_job" => true,
         _ => false
@@ -99,6 +100,7 @@ public sealed class McpRequestDispatcher
             "manage_graphics" => ManageGraphics(a),
             "manage_profiler" => ManageProfiler(a),
             "manage_build" => ManageBuild(a),
+            "manage_mission" => ManageMission(a),
             "run_tests" => RunTests(a),
             "get_test_job" => GetTestJob(a),
             _ => Err($"Unknown tool: {name}")
@@ -880,6 +882,21 @@ $"[CreateAssetMenu(menuName = \"Breach Scenario Engine MCP/{Ident(name)}\")]\n" 
             "profiles" => Bridge("manage_build", a),
             "scenes" => Bridge("manage_build", InjectArg(a, "action", "scenes")),
             _ => Err($"Unsupported manage_build action: {action}")
+        };
+    }
+
+    private ToolCallResult ManageMission(JsonElement a)
+    {
+        var action = (Opt(a, "action") ?? "validate_template").ToLowerInvariant();
+        return action switch
+        {
+            "validate_template" => Bridge("manage_mission", InjectArg(a, "action", "validate_template")),
+            "compile_payload" => Bridge("manage_mission", InjectArg(a, "action", "compile_payload")),
+            "generate_layout" => Bridge("manage_mission", InjectArg(a, "action", "generate_layout")),
+            "place_entities" => Bridge("manage_mission", InjectArg(a, "action", "place_entities")),
+            "verify" => Bridge("manage_mission", InjectArg(a, "action", "verify")),
+            "write_manifest" => Bridge("manage_mission", InjectArg(a, "action", "write_manifest")),
+            _ => Err($"Unsupported manage_mission action: {action}")
         };
     }
 

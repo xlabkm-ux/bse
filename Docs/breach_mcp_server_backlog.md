@@ -394,13 +394,19 @@ Confirmed weak areas:
 
 - Priority: `P0`
 - Complexity: `L`
-- Status: planned
+- Status: in progress
 - Goal: implement `manage_mission(...)` actions from `mission_pipeline_contract_v2.2.md`
 - Why: the first project feature needs a dedicated mission pipeline surface instead of hiding generation behind generic asset tools
 - Dependencies:
   - mission authoring contract
   - payload contract
   - generation manifest contract
+- Current slice:
+  - `validate_template` implemented for mission template intake/schema checks
+  - `compile_payload` implemented for `mission_payload.generated.json` and `mission_compile_report.json`
+  - bridge responses preserve the shared mission result envelope with `status`, `artifacts`, and `findings`
+  - template validation findings stay on the `TPL_*` code family
+  - layout, placement, verification, retry, and manifest writing remain pending
 
 ## Recommended Delivery Waves
 

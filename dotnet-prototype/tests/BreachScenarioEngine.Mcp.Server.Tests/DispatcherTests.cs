@@ -27,7 +27,7 @@ public sealed class DispatcherTests
             "project_root.set","project.info","project.health_check","project.capabilities","editor.state","read_console",
             "manage_asset","manage_hierarchy","manage_scene","manage_gameobject","manage_components",
             "manage_script","manage_scriptableobject","manage_prefabs","manage_graph","manage_ui","manage_localization",
-            "manage_editor","manage_input","manage_camera","manage_graphics","manage_profiler","manage_build","run_tests","get_test_job",
+            "manage_editor","manage_input","manage_camera","manage_graphics","manage_profiler","manage_build","manage_mission","run_tests","get_test_job",
         };
 
         foreach (var tool in expected)
@@ -46,7 +46,7 @@ public sealed class DispatcherTests
             "project_root.set","project.info","project.health_check","project.capabilities","editor.state","read_console",
             "manage_asset","manage_hierarchy","manage_scene","manage_gameobject","manage_components",
             "manage_script","manage_scriptableobject","manage_prefabs","manage_graph","manage_ui","manage_localization",
-            "manage_editor","manage_input","manage_camera","manage_graphics","manage_profiler","manage_build","run_tests","get_test_job",
+            "manage_editor","manage_input","manage_camera","manage_graphics","manage_profiler","manage_build","manage_mission","run_tests","get_test_job",
         }.OrderBy(x => x, StringComparer.Ordinal).ToArray();
 
         Assert.Equal(expected, runtime);
@@ -693,6 +693,84 @@ public sealed class DispatcherTests
     }
 
     [Theory]
+    [InlineData("validate_template")]
+    [InlineData("compile_payload")]
+    public void HandleToolCall_ManageMission_QueuesBridgeCommand(string action)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            using var doc = JsonDocument.Parse($$"""
+            {
+              "params": {
+                "name": "manage_mission",
+                "arguments": {
+                  "action": "{{action}}",
+                  "projectRoot": "{{root.Replace("\\", "\\\\")}}",
+                  "missionId": "VS01_HostageApartment",
+                  "waitMs": 0
+                }
+              }
+            }
+            """);
+
+            var result = _dispatcher.HandleToolCall(doc.RootElement);
+
+            var cmdDir = Path.Combine(root, "Library", "BreachMcpBridge", "commands");
+            Assert.False(result.IsError);
+            Assert.Contains("queued:manage_mission", result.Content[0].Text);
+            Assert.True(Directory.Exists(cmdDir));
+            Assert.NotEmpty(Directory.GetFiles(cmdDir, "*.json"));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void HandleToolCall_ManageMission_UnsupportedAction_ReturnsValidationError()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            using var doc = JsonDocument.Parse($$"""
+            {
+              "params": {
+                "name": "manage_mission",
+                "arguments": {
+                  "action": "bogus_action",
+                  "projectRoot": "{{root.Replace("\\", "\\\\")}}",
+                  "missionId": "VS01_HostageApartment"
+                }
+              }
+            }
+            """);
+
+            var result = _dispatcher.HandleToolCall(doc.RootElement);
+
+            Assert.True(result.IsError);
+            Assert.Contains("validation error", result.Content[0].Text);
+            Assert.Contains("property 'action'", result.Content[0].Text);
+            Assert.Contains("unsupported value", result.Content[0].Text);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Theory]
     [InlineData("project.capabilities")]
     [InlineData("editor.state")]
     [InlineData("read_console")]
@@ -707,6 +785,7 @@ public sealed class DispatcherTests
     [InlineData("manage_graphics")]
     [InlineData("manage_profiler")]
     [InlineData("manage_build")]
+    [InlineData("manage_mission")]
     [InlineData("run_tests")]
     [InlineData("get_test_job")]
     [InlineData("manage_hierarchy")]
@@ -736,6 +815,7 @@ public sealed class DispatcherTests
                 "manage_graphics" => "\"action\": \"set_quality_level\", \"quality_level\": \"Low\",",
                 "manage_profiler" => "\"action\": \"get_counters\",",
                 "manage_build" => "\"action\": \"profiles\", \"mode\": \"get_active\",",
+                "manage_mission" => "\"action\": \"validate_template\", \"missionId\": \"VS01_HostageApartment\",",
                 "run_tests" => "\"mode\": \"EditMode\",",
                 "get_test_job" => "\"jobId\": \"job-123\",",
                 "manage_hierarchy" => "\"action\": \"find\", \"query\": \"Operative\",",

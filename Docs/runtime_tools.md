@@ -34,6 +34,7 @@ The inventory is target-only.
 - `manage_graphics`
 - `manage_profiler`
 - `manage_build`
+- `manage_mission`
 - `run_tests`
 - `get_test_job`
 
@@ -42,4 +43,5 @@ The inventory is target-only.
 - The runtime no longer advertises legacy bridge command names in `tools/list`.
 - The target names above are the ones to use in new workflows and docs.
 - `manage_editor` now covers editor status/play mode plus Unity MCP package lifecycle actions: `install`, `update`, and `delete`.
-- `manage_mission` is a target mission-pipeline tool family documented in `mission_pipeline_contract_v2.2.md`; it is not part of the current runtime inventory yet.
+- `manage_mission` is now part of the current runtime inventory for the mission pipeline. The first vertical slice supports `validate_template` and `compile_payload`; `generate_layout`, `place_entities`, `verify`, and `write_manifest` remain planned follow-up actions.
+- `manage_mission` returns the shared mission JSON envelope in the tool result text, so callers should parse `status`, `missionId`, `pipelineVersion`, `artifacts`, and `findings` from the returned string.
