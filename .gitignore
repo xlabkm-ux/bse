@@ -1,0 +1,33 @@
+# Unity generated folders
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.csproj.user
+
+# OS / misc
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Mission pipeline outputs
+UserMissionSources/**/mission_payload.generated.json
+UserMissionSources/**/mission_compile_report.json
+UserMissionSources/**/mission_state.json
+UserMissionSources/**/generation_manifest.json
+UserMissionSources/**/verification_summary.json
+UserMissionSources/**/codex_review.json
+UserMissionSources/**/clarification_questions.md
+
