@@ -1,0 +1,22 @@
+﻿{
+  "name": "XLab.UnityMcp.Editor",
+  "rootNamespace": "XLab.UnityMcp.Editor",
+  "references": [],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "System.Buffers.dll",
+    "System.Memory.dll",
+    "System.Runtime.CompilerServices.Unsafe.dll",
+    "System.Text.Encodings.Web.dll",
+    "System.Text.Json.dll"
+  ],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

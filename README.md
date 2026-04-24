@@ -8,6 +8,8 @@ Initial project scaffold for **TACTICAL BREACH: Mission Architect / Breach Scena
 - `Assets/Scripts/` - gameplay and generation code
 - `Assets/Editor/` - editor tooling and MCP integration
 - `UserMissionSources/` - mission authoring inputs and generated mission artifacts
+- `mcp/` - imported MCP server prompts, policies, resources, and validators
+- `dotnet-prototype/` - imported .NET MCP server prototype and Unity bridge package
 - `Docs/` - supporting notes and technical references
 - `Packages/manifest.json` - Unity package manifest
 - `ProjectSettings/` - Unity project configuration
@@ -28,6 +30,7 @@ Initial project scaffold for **TACTICAL BREACH: Mission Architect / Breach Scena
 
 ## Next Steps
 
+- Wire the imported MCP modules into the new server bootstrap
 - Add runtime assemblies under `Assets/Scripts/`
 - Add MCP/editor tooling under `Assets/Editor/`
 - Connect the mission compiler and verification pipeline
