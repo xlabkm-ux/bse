@@ -361,6 +361,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             }
 
             var verificationStatus = summaryNode["status"]?.GetValue<string>() ?? "";
+            var manifestStatus = "PASS";
             if (!string.Equals(verificationStatus, "PASS", StringComparison.Ordinal))
             {
                 var retryResult = TryRunRetryPipeline(template!, payloadPath, layoutPath, entitiesPath, summaryPath, summaryNode, artifacts, retrySeeds, findings);
@@ -369,18 +370,22 @@ namespace BreachScenarioEngine.Mcp.Editor
                 verificationStatus = summaryNode["status"]?.GetValue<string>() ?? "";
                 if (!retryResult.Success)
                 {
-                    findings.Add(Finding("error", "MISSION_VERIFICATION_FAILED", "generation_manifest.json is written only after verification status PASS", ToRepoPath(summaryPath)));
-                    return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+                    findings.Add(Finding("error", "MISSION_VERIFICATION_FAILED", "generation_manifest.json records non-PASS verification with effectiveSeed 0", ToRepoPath(summaryPath)));
+                    manifestStatus = VerificationFailureIsRetryable(summaryNode) ? "FAILED" : "BLOCKED";
                 }
             }
 
-            var acceptedSeed = AcceptedGenerationSeed(template!, retrySeeds, summaryNode);
-            var layoutRevisionId = summaryNode["layoutRevisionId"]?.GetValue<string>() ?? ComputeLayoutRevisionId(template!, acceptedSeed);
-            var expectedRevisionId = ComputeLayoutRevisionId(template!, acceptedSeed);
-            if (!string.Equals(layoutRevisionId, expectedRevisionId, StringComparison.Ordinal))
+            var verificationPassed = string.Equals(manifestStatus, "PASS", StringComparison.Ordinal);
+            var acceptedSeed = verificationPassed ? AcceptedGenerationSeed(template!, retrySeeds, summaryNode) : 0;
+            var layoutRevisionId = summaryNode["layoutRevisionId"]?.GetValue<string>() ?? ComputeLayoutRevisionId(template!, verificationPassed ? acceptedSeed : template.InitialSeed);
+            if (verificationPassed)
             {
-                findings.Add(Finding("error", "ORDER_VIOLATION_STALE_LAYOUT_GRAPH", "write_manifest requires the current layoutRevisionId from verification", ToRepoPath(summaryPath)));
-                return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+                var expectedRevisionId = ComputeLayoutRevisionId(template!, acceptedSeed);
+                if (!string.Equals(layoutRevisionId, expectedRevisionId, StringComparison.Ordinal))
+                {
+                    findings.Add(Finding("error", "ORDER_VIOLATION_STALE_LAYOUT_GRAPH", "write_manifest requires the current layoutRevisionId from verification", ToRepoPath(summaryPath)));
+                    return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+                }
             }
 
             if (!GenerationLockSet.TryAcquire(template.MissionId, missionDir, manifestPath, out var generationLocks, out var conflictPath))
@@ -392,24 +397,36 @@ namespace BreachScenarioEngine.Mcp.Editor
             using (generationLocks!)
             {
                 var payloadNode = ReadJsonObject(payloadPath);
-                if (payloadNode == null)
+                if (verificationPassed && payloadNode == null)
                 {
                     findings.Add(Finding("error", "PAYLOAD_FILE_MISSING", "write_manifest requires mission_payload.generated.json from compile_payload", ToRepoPath(payloadPath)));
                     return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
                 }
 
-                var effectiveSeed = ExistingAcceptedEffectiveSeed(existingManifest);
-                if (effectiveSeed <= 0)
+                payloadNode ??= new JsonObject
                 {
-                    effectiveSeed = acceptedSeed;
+                    ["profileRefs"] = template.ProfileRefs()
+                };
+                Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
+                File.WriteAllText(manifestPath, BuildGenerationManifestNode(template, "PENDING", 0, retrySeeds, layoutRevisionId, payloadNode, summaryNode, artifacts).ToJsonString() + Environment.NewLine);
+
+                var effectiveSeed = 0;
+                if (verificationPassed)
+                {
+                    effectiveSeed = ExistingAcceptedEffectiveSeed(existingManifest);
+                    if (effectiveSeed <= 0)
+                    {
+                        effectiveSeed = acceptedSeed;
+                    }
+
+                    StampPayloadReplayFields(payloadPath, payloadNode, effectiveSeed, layoutRevisionId);
                 }
 
-                StampPayloadReplayFields(payloadPath, payloadNode, effectiveSeed, layoutRevisionId);
-                var manifestNode = BuildGenerationManifestNode(template, effectiveSeed, retrySeeds, layoutRevisionId, payloadNode, summaryNode, artifacts);
+                var manifestNode = BuildGenerationManifestNode(template, manifestStatus, effectiveSeed, retrySeeds, layoutRevisionId, payloadNode, summaryNode, artifacts);
                 File.WriteAllText(manifestPath, manifestNode.ToJsonString() + Environment.NewLine);
                 AssetDatabase.Refresh();
 
-                return (true, MissionResultJson("PASS", template.MissionId, artifacts, findings));
+                return (verificationPassed, MissionResultJson(verificationPassed ? "PASS" : "FAIL", template.MissionId, artifacts, findings));
             }
         }
 
@@ -1436,6 +1453,7 @@ namespace BreachScenarioEngine.Mcp.Editor
 
         private static JsonObject BuildGenerationManifestNode(
             MissionTemplateModel template,
+            string status,
             int effectiveSeed,
             IReadOnlyList<int> retrySeeds,
             string layoutRevisionId,
@@ -1448,7 +1466,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["schemaVersion"] = "bse.generation_manifest.v2.2",
                 ["pipelineVersion"] = PipelineVersion,
                 ["missionId"] = template.MissionId,
-                ["status"] = "PASS",
+                ["status"] = status,
                 ["requestedSeed"] = template.InitialSeed,
                 ["effectiveSeed"] = effectiveSeed,
                 ["retrySeeds"] = new JsonArray(retrySeeds.Select(s => (JsonNode?)JsonValue.Create(s)).ToArray()),

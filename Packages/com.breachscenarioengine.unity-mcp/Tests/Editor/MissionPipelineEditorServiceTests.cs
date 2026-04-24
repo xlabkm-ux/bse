@@ -434,7 +434,7 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
         }
 
         [Test]
-        public void WriteManifest_WhenVerificationFailed_DoesNotWriteManifest()
+        public void WriteManifest_WhenVerificationBlocked_WritesBlockedManifestWithoutEffectiveSeed()
         {
             var templatePath = Path.Combine(_testRoot, "manifest-fail.template.yaml");
             var summaryPath = Path.Combine(_testRoot, "verification_summary.json");
@@ -454,10 +454,54 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             var (success, message) = MissionPipelineEditorService.Execute("write_manifest", RawArgs(templatePath, verificationPath: summaryPath, manifestPath: manifestPath));
 
             Assert.False(success);
-            Assert.False(File.Exists(manifestPath));
+            Assert.True(File.Exists(manifestPath));
             using var doc = JsonDocument.Parse(message);
             var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
             Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "MISSION_VERIFICATION_FAILED"));
+            using var manifestDoc = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            var manifest = manifestDoc.RootElement;
+            Assert.AreEqual("BLOCKED", manifest.GetProperty("status").GetString());
+            Assert.AreEqual(0, manifest.GetProperty("effectiveSeed").GetInt32());
+            Assert.AreEqual("FAIL", manifest.GetProperty("verification").GetProperty("status").GetString());
+        }
+
+        [Test]
+        public void WriteManifest_WhenRetryBudgetExhausted_WritesFailedManifestWithoutEffectiveSeed()
+        {
+            var templatePath = Path.Combine(_testRoot, "manifest-retry-exhausted.template.yaml");
+            var summaryPath = Path.Combine(_testRoot, "verification_summary.json");
+            var manifestPath = Path.Combine(_testRoot, "generation_manifest.json");
+            File.WriteAllText(templatePath, ValidTemplate("VS83_RetryExhausted").Replace("  maxRetries: 5", "  maxRetries: 0"));
+            File.WriteAllText(summaryPath, new JsonObject
+            {
+                ["schemaVersion"] = "bse.verification_summary.v2.2",
+                ["pipelineVersion"] = "2.2",
+                ["missionId"] = "VS83_RetryExhausted",
+                ["status"] = "FAIL",
+                ["layoutRevisionId"] = "layout_failed",
+                ["findings"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["severity"] = "error",
+                        ["code"] = "NAV_OBJECTIVE_UNREACHABLE",
+                        ["message"] = "Objective is unreachable"
+                    }
+                },
+                ["metrics"] = new JsonObject()
+            }.ToJsonString());
+
+            var (success, message) = MissionPipelineEditorService.Execute("write_manifest", RawArgs(templatePath, verificationPath: summaryPath, manifestPath: manifestPath));
+
+            Assert.False(success);
+            Assert.True(File.Exists(manifestPath));
+            using var doc = JsonDocument.Parse(message);
+            var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
+            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "RETRY_BUDGET_EXHAUSTED"));
+            using var manifestDoc = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            var manifest = manifestDoc.RootElement;
+            Assert.AreEqual("FAILED", manifest.GetProperty("status").GetString());
+            Assert.AreEqual(0, manifest.GetProperty("effectiveSeed").GetInt32());
         }
 
         [Test]
