@@ -411,11 +411,11 @@ Confirmed weak areas:
   - generated placement entities carry stable ownership metadata plus `roomId`, `navNodeId`, and `layoutRevisionId`
   - `verify` writes `verification_summary.json` with structured findings and metrics for reachability, tactical density, performance budgets, and profile references
   - `write_manifest` writes `generation_manifest.json` only after PASS verification, stamps replay-owned payload fields, preserves accepted `effectiveSeed`, records retry seeds, and rejects concurrent manifest writes with `GENERATION_LOCK_CONFLICT`
+  - retry execution returns retryable Step 7 failures to Step 6, reruns placement and verification, records deterministic retry seeds, and writes the manifest only after PASS
   - bridge responses preserve the shared mission result envelope with `status`, `artifacts`, and `findings`
   - template validation findings stay on the `TPL_*` code family
   - targeted Unity editor tests cover the success path, ordering failures, stale artifacts, verification failures, manifest lock conflicts, bridge-side action routing, capability reporting, and default artifact paths
   - server dispatcher tests cover routing for every public `manage_mission` action and validate the queued bridge command payload
-  - retry execution remains pending
 
 ## Recommended Delivery Waves
 

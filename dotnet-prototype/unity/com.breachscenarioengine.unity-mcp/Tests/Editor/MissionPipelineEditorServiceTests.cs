@@ -436,6 +436,47 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
         }
 
         [Test]
+        public void WriteManifest_WithRetryableVerificationFailure_RetriesFromLayoutAndWritesManifest()
+        {
+            var templatePath = Path.Combine(_testRoot, "manifest-retry.template.yaml");
+            var payloadPath = Path.Combine(_testRoot, "mission_payload.generated.json");
+            var layoutPath = Path.Combine(_testRoot, "mission_layout.generated.json");
+            var entitiesPath = Path.Combine(_testRoot, "mission_entities.generated.json");
+            var summaryPath = Path.Combine(_testRoot, "verification_summary.json");
+            var manifestPath = Path.Combine(_testRoot, "generation_manifest.json");
+            File.WriteAllText(templatePath, ValidTemplate("VS85_ManifestRetry"));
+
+            Assert.True(MissionPipelineEditorService.Execute("compile_payload", RawArgs(templatePath, payloadPath)).Success);
+            RewritePayloadProfileRefsToTempAssets(payloadPath);
+            Assert.True(MissionPipelineEditorService.Execute("generate_layout", RawArgs(templatePath, payloadPath, layoutPath)).Success);
+            using (var layoutDoc = JsonDocument.Parse(File.ReadAllText(layoutPath)))
+            {
+                var layout = JsonNode.Parse(layoutDoc.RootElement.GetRawText()).AsObject();
+                layout["PortalGraph"]["portals"] = new JsonArray();
+                File.WriteAllText(layoutPath, layout.ToJsonString());
+            }
+
+            Assert.True(MissionPipelineEditorService.Execute("place_entities", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath)).Success);
+            Assert.False(MissionPipelineEditorService.Execute("verify", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath, summaryPath)).Success);
+
+            var (success, message) = MissionPipelineEditorService.Execute("write_manifest", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath, summaryPath, manifestPath));
+
+            Assert.True(success, message);
+            using var manifestDoc = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            var manifest = manifestDoc.RootElement;
+            var retrySeeds = manifest.GetProperty("retrySeeds").EnumerateArray().Select(s => s.GetInt32()).ToArray();
+            Assert.AreEqual(1, retrySeeds.Length);
+            Assert.AreEqual(retrySeeds[0], manifest.GetProperty("effectiveSeed").GetInt32());
+            Assert.AreEqual("PASS", manifest.GetProperty("verification").GetProperty("status").GetString());
+
+            using var summaryDoc = JsonDocument.Parse(File.ReadAllText(summaryPath));
+            Assert.AreEqual("PASS", summaryDoc.RootElement.GetProperty("status").GetString());
+            using var layoutAfterRetryDoc = JsonDocument.Parse(File.ReadAllText(layoutPath));
+            Assert.AreEqual(retrySeeds[0], layoutAfterRetryDoc.RootElement.GetProperty("generationSeed").GetInt32());
+            Assert.Greater(layoutAfterRetryDoc.RootElement.GetProperty("PortalGraph").GetProperty("portals").GetArrayLength(), 0);
+        }
+
+        [Test]
         public void WriteManifest_WhenLockExists_ReturnsLockConflict()
         {
             var templatePath = Path.Combine(_testRoot, "manifest-lock.template.yaml");

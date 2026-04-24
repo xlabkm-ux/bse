@@ -23,6 +23,14 @@ namespace BreachScenarioEngine.Mcp.Editor
         private static readonly HashSet<string> TacticalThemes = new(StringComparer.Ordinal) { "urban_cqb", "stealth_facility", "residential" };
         private static readonly HashSet<string> NavigationPolicies = new(StringComparer.Ordinal) { "FullAccess", "StaticGuard", "CanOpenDoors", "Immobilized" };
         private static readonly HashSet<string> PlacementPolicies = new(StringComparer.Ordinal) { "EntryPointOnly", "PostLayout_TaggedRoom", "PostLayout_AnyRoom", "SecureRoomOnly" };
+        private static readonly HashSet<string> RetryableVerificationCodes = new(StringComparer.Ordinal)
+        {
+            "NAV_BREACHPOINT_UNREACHABLE",
+            "NAV_OBJECTIVE_UNREACHABLE",
+            "LAYOUT_GENERATION_FAILED",
+            "TB-AUD-003",
+            "TACTICAL_DENSITY_IMPOSSIBLE_BUDGET"
+        };
 
         public static (bool Success, string Message) Execute(string action, string raw)
         {
@@ -182,7 +190,6 @@ namespace BreachScenarioEngine.Mcp.Editor
                 layoutNode = null;
             }
 
-            var expectedRevisionId = ComputeLayoutRevisionId(template!);
             var layoutRevisionId = layoutNode?["layoutRevisionId"]?.GetValue<string>() ?? "";
             var layoutMissionId = layoutNode?["missionId"]?.GetValue<string>() ?? "";
             if (layoutNode == null || layoutNode["LayoutGraph"] is not JsonObject || layoutNode["RoomGraph"] is not JsonObject)
@@ -191,6 +198,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                 return (false, MissionResultJson("FAIL", template.MissionId, new[] { ToRepoPath(layoutPath) }, findings));
             }
 
+            var expectedRevisionId = ComputeLayoutRevisionId(template!, LayoutGenerationSeed(layoutNode, template.InitialSeed));
             if (!string.Equals(layoutMissionId, template.MissionId, StringComparison.Ordinal) ||
                 !string.Equals(layoutRevisionId, expectedRevisionId, StringComparison.Ordinal))
             {
@@ -251,8 +259,10 @@ namespace BreachScenarioEngine.Mcp.Editor
             var layoutNode = ReadJsonObject(layoutPath);
             var entitiesNode = ReadJsonObject(entitiesPath);
             var payloadNode = ReadJsonObject(payloadPath);
-            var expectedRevisionId = ComputeLayoutRevisionId(template!);
             var metrics = EmptyVerificationMetrics();
+            var expectedRevisionId = layoutNode == null
+                ? ComputeLayoutRevisionId(template!)
+                : ComputeLayoutRevisionId(template!, LayoutGenerationSeed(layoutNode, template!.InitialSeed));
 
             if (payloadNode == null)
             {
@@ -343,15 +353,30 @@ namespace BreachScenarioEngine.Mcp.Editor
                 return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
             }
 
+            var retrySeeds = ReadRetrySeeds(raw);
+            var existingManifest = ReadJsonObject(manifestPath);
+            if (retrySeeds.Count == 0 && existingManifest?["retrySeeds"] is JsonArray existingRetrySeeds)
+            {
+                retrySeeds = existingRetrySeeds.OfType<JsonValue>().Select(v => v.GetValue<int>()).ToList();
+            }
+
             var verificationStatus = summaryNode["status"]?.GetValue<string>() ?? "";
             if (!string.Equals(verificationStatus, "PASS", StringComparison.Ordinal))
             {
-                findings.Add(Finding("error", "MISSION_VERIFICATION_FAILED", "generation_manifest.json is written only after verification status PASS", ToRepoPath(summaryPath)));
-                return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+                var retryResult = TryRunRetryPipeline(template!, payloadPath, layoutPath, entitiesPath, summaryPath, summaryNode, artifacts, retrySeeds, findings);
+                summaryNode = retryResult.SummaryNode;
+                retrySeeds = retryResult.RetrySeeds;
+                verificationStatus = summaryNode["status"]?.GetValue<string>() ?? "";
+                if (!retryResult.Success)
+                {
+                    findings.Add(Finding("error", "MISSION_VERIFICATION_FAILED", "generation_manifest.json is written only after verification status PASS", ToRepoPath(summaryPath)));
+                    return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+                }
             }
 
-            var layoutRevisionId = summaryNode["layoutRevisionId"]?.GetValue<string>() ?? ComputeLayoutRevisionId(template!);
-            var expectedRevisionId = ComputeLayoutRevisionId(template!);
+            var acceptedSeed = AcceptedGenerationSeed(template!, retrySeeds, summaryNode);
+            var layoutRevisionId = summaryNode["layoutRevisionId"]?.GetValue<string>() ?? ComputeLayoutRevisionId(template!, acceptedSeed);
+            var expectedRevisionId = ComputeLayoutRevisionId(template!, acceptedSeed);
             if (!string.Equals(layoutRevisionId, expectedRevisionId, StringComparison.Ordinal))
             {
                 findings.Add(Finding("error", "ORDER_VIOLATION_STALE_LAYOUT_GRAPH", "write_manifest requires the current layoutRevisionId from verification", ToRepoPath(summaryPath)));
@@ -377,17 +402,10 @@ namespace BreachScenarioEngine.Mcp.Editor
                     return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
                 }
 
-                var existingManifest = ReadJsonObject(manifestPath);
                 var effectiveSeed = ExistingAcceptedEffectiveSeed(existingManifest);
                 if (effectiveSeed <= 0)
                 {
-                    effectiveSeed = template.InitialSeed;
-                }
-
-                var retrySeeds = ReadRetrySeeds(raw);
-                if (retrySeeds.Count == 0 && existingManifest?["retrySeeds"] is JsonArray existingRetrySeeds)
-                {
-                    retrySeeds = existingRetrySeeds.OfType<JsonValue>().Select(v => v.GetValue<int>()).ToList();
+                    effectiveSeed = acceptedSeed;
                 }
 
                 StampPayloadReplayFields(payloadPath, payloadNode, effectiveSeed, layoutRevisionId);
@@ -537,7 +555,12 @@ namespace BreachScenarioEngine.Mcp.Editor
 
         private static JsonObject BuildLayoutNode(MissionTemplateModel template)
         {
-            var revisionId = ComputeLayoutRevisionId(template);
+            return BuildLayoutNode(template, template.InitialSeed);
+        }
+
+        private static JsonObject BuildLayoutNode(MissionTemplateModel template, int generationSeed)
+        {
+            var revisionId = ComputeLayoutRevisionId(template, generationSeed);
             var rooms = BuildRooms(template, revisionId);
             var portals = BuildPortals(revisionId, rooms);
             var coverPoints = BuildCoverPoints(revisionId, rooms);
@@ -549,6 +572,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["missionId"] = template.MissionId,
                 ["layoutRevisionId"] = revisionId,
                 ["requestedSeed"] = template.InitialSeed,
+                ["generationSeed"] = generationSeed,
                 ["retryPolicy"] = new JsonObject
                 {
                     ["retryFromStep"] = 6,
@@ -863,11 +887,16 @@ namespace BreachScenarioEngine.Mcp.Editor
 
         private static string ComputeLayoutRevisionId(MissionTemplateModel template)
         {
+            return ComputeLayoutRevisionId(template, template.InitialSeed);
+        }
+
+        private static string ComputeLayoutRevisionId(MissionTemplateModel template, int generationSeed)
+        {
             var source = new JsonObject
             {
                 ["pipelineVersion"] = PipelineVersion,
                 ["missionId"] = template.MissionId,
-                ["requestedSeed"] = template.InitialSeed,
+                ["requestedSeed"] = generationSeed,
                 ["bounds"] = IntArrayNode(template.WorldBounds),
                 ["theme"] = template.TacticalTheme,
                 ["ppu"] = template.PixelsPerUnit,
@@ -884,6 +913,18 @@ namespace BreachScenarioEngine.Mcp.Editor
             using var sha = SHA256.Create();
             var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(source.ToJsonString()));
             return "layout_" + BitConverter.ToString(bytes, 0, 4).Replace("-", string.Empty).ToLowerInvariant();
+        }
+
+        private static int LayoutGenerationSeed(JsonObject layoutNode, int fallbackSeed)
+        {
+            try
+            {
+                return layoutNode["generationSeed"]?.GetValue<int>() ?? fallbackSeed;
+            }
+            catch
+            {
+                return fallbackSeed;
+            }
         }
 
         private static void TryStampPayloadLayoutRevision(string payloadPath, string layoutRevisionId)
@@ -1124,6 +1165,116 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["findings"] = FindingsArray(findings),
                 ["metrics"] = (JsonObject)metrics.DeepClone()
             };
+        }
+
+        private static (bool Success, JsonObject SummaryNode, List<int> RetrySeeds) TryRunRetryPipeline(
+            MissionTemplateModel template,
+            string payloadPath,
+            string layoutPath,
+            string entitiesPath,
+            string summaryPath,
+            JsonObject failedSummary,
+            IEnumerable<string> artifacts,
+            List<int> retrySeeds,
+            List<JsonObject> findings)
+        {
+            if (!VerificationFailureIsRetryable(failedSummary))
+            {
+                return (false, failedSummary, retrySeeds);
+            }
+
+            if (retrySeeds.Count >= template.MaxRetries)
+            {
+                findings.Add(Finding("error", "RETRY_BUDGET_EXHAUSTED", "Verification failed with retryable findings, but generationMeta.maxRetries has been exhausted", ToRepoPath(summaryPath)));
+                return (false, failedSummary, retrySeeds);
+            }
+
+            var summaryNode = failedSummary;
+            while (retrySeeds.Count < template.MaxRetries)
+            {
+                var retrySeed = DeriveRetrySeed(template.InitialSeed, template.MissionId, retrySeeds.Count + 1);
+                retrySeeds.Add(retrySeed);
+
+                var layoutNode = BuildLayoutNode(template, retrySeed);
+                Directory.CreateDirectory(Path.GetDirectoryName(layoutPath)!);
+                File.WriteAllText(layoutPath, layoutNode.ToJsonString() + Environment.NewLine);
+                TryStampPayloadLayoutRevision(payloadPath, layoutNode["layoutRevisionId"]!.GetValue<string>());
+
+                var placementNode = BuildEntityPlacementNode(template, layoutNode);
+                Directory.CreateDirectory(Path.GetDirectoryName(entitiesPath)!);
+                File.WriteAllText(entitiesPath, placementNode.ToJsonString() + Environment.NewLine);
+
+                var attemptFindings = new List<JsonObject>();
+                var payloadNode = ReadJsonObject(payloadPath);
+                if (payloadNode == null)
+                {
+                    attemptFindings.Add(Finding("error", "PAYLOAD_FILE_MISSING", "retry verification requires mission_payload.generated.json from compile_payload", ToRepoPath(payloadPath)));
+                }
+                else
+                {
+                    ValidateProfileRefs(payloadNode, attemptFindings);
+                }
+
+                var metrics = ComputeVerificationMetrics(layoutNode, placementNode, attemptFindings);
+                var status = attemptFindings.Any(f => string.Equals(f["severity"]?.GetValue<string>(), "error", StringComparison.Ordinal)) ? "FAIL" : "PASS";
+                summaryNode = BuildVerificationSummaryNode(template.MissionId, status, layoutNode["layoutRevisionId"]!.GetValue<string>(), artifacts, attemptFindings, metrics);
+                Directory.CreateDirectory(Path.GetDirectoryName(summaryPath)!);
+                File.WriteAllText(summaryPath, summaryNode.ToJsonString() + Environment.NewLine);
+
+                if (string.Equals(status, "PASS", StringComparison.Ordinal))
+                {
+                    findings.Add(Finding("warning", "MISSION_RETRIED", $"Verification passed after deterministic retry seed {retrySeed}", ToRepoPath(summaryPath)));
+                    AssetDatabase.Refresh();
+                    return (true, summaryNode, retrySeeds);
+                }
+
+                if (!VerificationFailureIsRetryable(summaryNode))
+                {
+                    AssetDatabase.Refresh();
+                    return (false, summaryNode, retrySeeds);
+                }
+            }
+
+            findings.Add(Finding("error", "RETRY_BUDGET_EXHAUSTED", "Verification retry attempts did not produce a passing mission", ToRepoPath(summaryPath)));
+            AssetDatabase.Refresh();
+            return (false, summaryNode, retrySeeds);
+        }
+
+        private static bool VerificationFailureIsRetryable(JsonObject summaryNode)
+        {
+            if (string.Equals(summaryNode["status"]?.GetValue<string>(), "PASS", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var errorCodes = (summaryNode["findings"] as JsonArray)?
+                .OfType<JsonObject>()
+                .Where(f => string.Equals(f["severity"]?.GetValue<string>(), "error", StringComparison.Ordinal))
+                .Select(f => f["code"]?.GetValue<string>() ?? "")
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .ToList() ?? new List<string>();
+
+            return errorCodes.Count > 0 && errorCodes.All(code => RetryableVerificationCodes.Contains(code));
+        }
+
+        private static int AcceptedGenerationSeed(MissionTemplateModel template, IReadOnlyList<int> retrySeeds, JsonObject summaryNode)
+        {
+            var layoutRevisionId = summaryNode["layoutRevisionId"]?.GetValue<string>() ?? "";
+            if (retrySeeds.Count > 0 && string.Equals(layoutRevisionId, ComputeLayoutRevisionId(template, retrySeeds[^1]), StringComparison.Ordinal))
+            {
+                return retrySeeds[^1];
+            }
+
+            return template.InitialSeed;
+        }
+
+        private static int DeriveRetrySeed(int requestedSeed, string missionId, int retryIndex)
+        {
+            using var sha = SHA256.Create();
+            var source = $"{requestedSeed}:{missionId}:{retryIndex}:{PipelineVersion}";
+            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(source));
+            var value = BitConverter.ToInt32(bytes, 0) & int.MaxValue;
+            return value == 0 ? retryIndex : value;
         }
 
         private static List<JsonObject> ValidatePayloadShape(JsonObject payload)

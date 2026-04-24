@@ -23,10 +23,11 @@ Completed:
 - generated placement entities carry stable ownership metadata, `roomId`, `navNodeId`, and `layoutRevisionId`
 - `verify` writes `verification_summary.json` with structured findings and metrics
 - Unity editor compilation was verified against the embedded package
+- retry execution returns retryable verification failures to Step 6 before
+  writing the manifest
 
 Pending:
 
-- retry policy
 - generation locks
 - richer template validation and schema fidelity
 - manifest/status lifecycle updates
@@ -210,6 +211,36 @@ Recommended handoff note:
 
 - "The pipeline is functionally complete enough for end-to-end checks. Please
   shore up tests and docs."
+
+## Session 8: Retry Execution
+
+Goal:
+
+- execute deterministic retries after Step 7 returns a retryable failure
+
+Status:
+
+- completed
+
+Work:
+
+- keep retry orchestration inside the existing public `manage_mission`
+  surface
+- derive retry seeds with the v2.2 hash policy
+- rerun Step 6 -> Step 5 -> Step 7 for retryable verification failures
+- write `generation_manifest.json` only after retry verification returns PASS
+- record attempted retry seeds and accepted `effectiveSeed`
+
+Exit criteria:
+
+- retryable verification failures return to layout generation, not placement
+- non-retryable failures still block manifest writing
+- retry seeds are recorded in `generation_manifest.json`
+
+Recommended handoff note:
+
+- "Retry execution is wired through write_manifest. Please keep future
+  generator changes honoring Step 6 -> Step 5 -> Step 7 on every retry."
 
 ## Suggested Chat Split
 
