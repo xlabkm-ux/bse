@@ -1,0 +1,40 @@
+schemaVersion: "tb.mission_template.v1.4"
+missionId: "TBM_0001_HostageApartment"
+missionTitle: "Hostage Apartment"
+seed: 428193
+phaseConstraint: 1
+
+spatialConstraints:
+  pixelsPerUnit: 128
+  tacticalTheme: "stealth"
+
+tacticalRules:
+  noiseAlertThreshold: 0.15
+  strictNavigationPolicy: true
+  enforcePostLayoutCharacterPlacement: true
+
+generationMeta:
+  effectiveSeed: 0
+  generationTimeout: 30
+  maxRetries: 5
+
+sections:
+  01_meta:
+    targetPlatform:
+      - Android_2D
+    unityProfile: Unity6_URP_2D
+
+  02_mission_brief:
+    situation: "Вооруженная группа удерживает заложника в городской квартире."
+    playerRole: "SWAT team"
+    primaryFantasy: "Тихое проникновение с быстрым контролируемым breach в финальной фазе."
+    themeStatement: "stealth hostage rescue with controlled final breach"
+    failureFantasy: "Игрок теряет контроль: враги слышат breach, заложник оказывается под угрозой."
+
+  03_gameplay:
+    gameMode: hostage_rescue
+    sessionLengthTargetSec: 240
+    playerSquad:
+      minOperators: 2
+      maxOperators: 4
+
