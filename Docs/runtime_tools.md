@@ -43,5 +43,6 @@ The inventory is target-only.
 - The runtime no longer advertises legacy bridge command names in `tools/list`.
 - The target names above are the ones to use in new workflows and docs.
 - `manage_editor` now covers editor status/play mode plus Unity MCP package lifecycle actions: `install`, `update`, and `delete`.
-- `manage_mission` is now part of the current runtime inventory for the mission pipeline. The current vertical slice supports `validate_template`, `compile_payload`, `generate_layout`, layout-gated `place_entities`, and `verify`; `write_manifest` remains a planned follow-up action.
+- `manage_mission` is now part of the current runtime inventory for the mission pipeline. The current vertical slice supports `validate_template`, `compile_payload`, `generate_layout`, layout-gated `place_entities`, `verify`, and `write_manifest`.
 - `manage_mission` returns the shared mission JSON envelope in the tool result text, so callers should parse `status`, `missionId`, `pipelineVersion`, `artifacts`, and `findings` from the returned string.
+- Mission pipeline regression coverage now includes direct Unity service tests, bridge route/capability checks, server dispatcher routing for every public mission action, and default artifact path creation.

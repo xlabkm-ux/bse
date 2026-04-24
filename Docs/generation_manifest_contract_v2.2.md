@@ -48,6 +48,8 @@ The user template owns only the requested seed through
   "artifacts": {
     "payload": "UserMissionSources/missions/VS01_HostageApartment/mission_payload.generated.json",
     "compileReport": "UserMissionSources/missions/VS01_HostageApartment/mission_compile_report.json",
+    "layout": "UserMissionSources/missions/VS01_HostageApartment/mission_layout.generated.json",
+    "entities": "UserMissionSources/missions/VS01_HostageApartment/mission_entities.generated.json",
     "verificationSummary": "UserMissionSources/missions/VS01_HostageApartment/verification_summary.json"
   },
   "verification": {

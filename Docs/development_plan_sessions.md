@@ -26,7 +26,6 @@ Completed:
 
 Pending:
 
-- `write_manifest`
 - retry policy
 - generation locks
 - richer template validation and schema fidelity
@@ -164,6 +163,10 @@ Goal:
 
 - implement `manage_mission(action="write_manifest")`
 
+Status:
+
+- completed
+
 Work:
 
 - write `generation_manifest.json`
@@ -185,6 +188,10 @@ Recommended handoff note:
 Goal:
 
 - protect the pipeline with tests and remove rough edges
+
+Status:
+
+- completed
 
 Work:
 

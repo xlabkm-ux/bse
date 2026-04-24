@@ -695,6 +695,10 @@ public sealed class DispatcherTests
     [Theory]
     [InlineData("validate_template")]
     [InlineData("compile_payload")]
+    [InlineData("generate_layout")]
+    [InlineData("place_entities")]
+    [InlineData("verify")]
+    [InlineData("write_manifest")]
     public void HandleToolCall_ManageMission_QueuesBridgeCommand(string action)
     {
         var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));
@@ -722,7 +726,10 @@ public sealed class DispatcherTests
             Assert.False(result.IsError);
             Assert.Contains("queued:manage_mission", result.Content[0].Text);
             Assert.True(Directory.Exists(cmdDir));
-            Assert.NotEmpty(Directory.GetFiles(cmdDir, "*.json"));
+            var commandFile = Assert.Single(Directory.GetFiles(cmdDir, "*.json"));
+            using var commandDoc = JsonDocument.Parse(File.ReadAllText(commandFile));
+            Assert.Equal("manage_mission", commandDoc.RootElement.GetProperty("command").GetString());
+            Assert.Equal(action, commandDoc.RootElement.GetProperty("arguments").GetProperty("action").GetString());
         }
         finally
         {

@@ -394,7 +394,7 @@ Confirmed weak areas:
 
 - Priority: `P0`
 - Complexity: `L`
-- Status: in progress
+- Status: completed
 - Goal: implement `manage_mission(...)` actions from `mission_pipeline_contract_v2.2.md`
 - Why: the first project feature needs a dedicated mission pipeline surface instead of hiding generation behind generic asset tools
 - Dependencies:
@@ -410,9 +410,12 @@ Confirmed weak areas:
   - `place_entities` writes deterministic `mission_entities.generated.json` actor/objective placement after validating the current `layoutRevisionId`
   - generated placement entities carry stable ownership metadata plus `roomId`, `navNodeId`, and `layoutRevisionId`
   - `verify` writes `verification_summary.json` with structured findings and metrics for reachability, tactical density, performance budgets, and profile references
+  - `write_manifest` writes `generation_manifest.json` only after PASS verification, stamps replay-owned payload fields, preserves accepted `effectiveSeed`, records retry seeds, and rejects concurrent manifest writes with `GENERATION_LOCK_CONFLICT`
   - bridge responses preserve the shared mission result envelope with `status`, `artifacts`, and `findings`
   - template validation findings stay on the `TPL_*` code family
-  - retry execution and manifest writing remain pending
+  - targeted Unity editor tests cover the success path, ordering failures, stale artifacts, verification failures, manifest lock conflicts, bridge-side action routing, capability reporting, and default artifact paths
+  - server dispatcher tests cover routing for every public `manage_mission` action and validate the queued bridge command payload
+  - retry execution remains pending
 
 ## Recommended Delivery Waves
 

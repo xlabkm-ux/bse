@@ -1362,7 +1362,7 @@ namespace BreachScenarioEngine.Mcp.Editor
         AddCapability(capabilities, "manage_mission", "generate_layout", true, "Deterministic mission layout and tactical graph generation is supported.");
         AddCapability(capabilities, "manage_mission", "place_entities", true, "Layout-gated actor and objective placement is supported.");
         AddCapability(capabilities, "manage_mission", "verify", true, "Mission verification summary generation is supported.");
-        AddCapability(capabilities, "manage_mission", "write_manifest", false, "Generation manifest writing is planned after verification.");
+        AddCapability(capabilities, "manage_mission", "write_manifest", true, "Generation manifest writing after PASS verification is supported.");
 
         AddCapability(capabilities, "run_tests", "run", true, "Test execution is supported.");
         AddCapability(capabilities, "get_test_job", "poll", true, "Test job polling is supported.");

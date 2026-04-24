@@ -33,7 +33,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                 "generate_layout" => GenerateLayout(raw),
                 "place_entities" => PlaceEntities(raw),
                 "verify" => Verify(raw),
-                "write_manifest" => NotImplemented(action),
+                "write_manifest" => WriteManifest(raw),
                 _ => (false, MissionResultJson("FAIL", "", Array.Empty<string>(), new[]
                 {
                     Finding("error", "MISSION_ACTION_UNSUPPORTED", $"Unsupported manage_mission action: {action}")
@@ -296,6 +296,120 @@ namespace BreachScenarioEngine.Mcp.Editor
             AssetDatabase.Refresh();
 
             return (status == "PASS", MissionResultJson(status, template.MissionId, artifacts, findings));
+        }
+
+        private static (bool Success, string Message) WriteManifest(string raw)
+        {
+            var context = ResolveContext(raw);
+            if (!context.Success)
+            {
+                return (false, context.Error!);
+            }
+
+            if (!MissionTemplateModel.TryLoad(context.TemplatePath!, context.MissionId, out var template, out var findings))
+            {
+                return (false, MissionResultJson("FAIL", context.MissionId ?? template?.MissionId ?? "", new[] { ToRepoPath(context.TemplatePath!) }, findings));
+            }
+
+            var missionDir = Path.GetDirectoryName(context.TemplatePath!)!;
+            var payloadPath = ResolveMissionArtifactPath(raw, "payloadPath", missionDir, "mission_payload.generated.json");
+            var layoutPath = ResolveMissionArtifactPath(raw, "layoutPath", missionDir, "mission_layout.generated.json");
+            var entitiesPath = ResolveMissionArtifactPath(raw, "entitiesPath", missionDir, "mission_entities.generated.json");
+            var summaryPath = ResolveMissionArtifactPath(raw, "verificationPath", missionDir, "verification_summary.json");
+            var manifestPath = ResolveMissionArtifactPath(raw, "manifestPath", missionDir, "generation_manifest.json");
+            if (!IsUnderProjectRoot(payloadPath) || !IsUnderProjectRoot(layoutPath) || !IsUnderProjectRoot(entitiesPath) ||
+                !IsUnderProjectRoot(summaryPath) || !IsUnderProjectRoot(manifestPath))
+            {
+                return (false, MissionResultJson("FAIL", template!.MissionId, new[] { ToRepoPath(context.TemplatePath!) }, new[]
+                {
+                    Finding("error", "MANIFEST_PATH_OUTSIDE_PROJECT", "manifest artifact paths must stay inside the Unity project root")
+                }));
+            }
+
+            var artifacts = new List<string>
+            {
+                ToRepoPath(payloadPath),
+                ToRepoPath(Path.Combine(missionDir, "mission_compile_report.json")),
+                ToRepoPath(layoutPath),
+                ToRepoPath(entitiesPath),
+                ToRepoPath(summaryPath),
+                ToRepoPath(manifestPath)
+            };
+
+            var summaryNode = ReadJsonObject(summaryPath);
+            if (summaryNode == null)
+            {
+                findings.Add(Finding("error", "VERIFICATION_SUMMARY_MISSING", "write_manifest requires verification_summary.json from verify", ToRepoPath(summaryPath)));
+                return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+            }
+
+            var verificationStatus = summaryNode["status"]?.GetValue<string>() ?? "";
+            if (!string.Equals(verificationStatus, "PASS", StringComparison.Ordinal))
+            {
+                findings.Add(Finding("error", "MISSION_VERIFICATION_FAILED", "generation_manifest.json is written only after verification status PASS", ToRepoPath(summaryPath)));
+                return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+            }
+
+            var layoutRevisionId = summaryNode["layoutRevisionId"]?.GetValue<string>() ?? ComputeLayoutRevisionId(template!);
+            var expectedRevisionId = ComputeLayoutRevisionId(template!);
+            if (!string.Equals(layoutRevisionId, expectedRevisionId, StringComparison.Ordinal))
+            {
+                findings.Add(Finding("error", "ORDER_VIOLATION_STALE_LAYOUT_GRAPH", "write_manifest requires the current layoutRevisionId from verification", ToRepoPath(summaryPath)));
+                return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+            }
+
+            var lockPath = manifestPath + ".lock";
+            FileStream? lockStream = null;
+            var lockAcquired = false;
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
+                lockStream = new FileStream(lockPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                lockAcquired = true;
+                var lockBytes = Encoding.UTF8.GetBytes($"bse-pipeline {DateTime.UtcNow:O}");
+                lockStream.Write(lockBytes, 0, lockBytes.Length);
+                lockStream.Flush();
+
+                var payloadNode = ReadJsonObject(payloadPath);
+                if (payloadNode == null)
+                {
+                    findings.Add(Finding("error", "PAYLOAD_FILE_MISSING", "write_manifest requires mission_payload.generated.json from compile_payload", ToRepoPath(payloadPath)));
+                    return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+                }
+
+                var existingManifest = ReadJsonObject(manifestPath);
+                var effectiveSeed = ExistingAcceptedEffectiveSeed(existingManifest);
+                if (effectiveSeed <= 0)
+                {
+                    effectiveSeed = template.InitialSeed;
+                }
+
+                var retrySeeds = ReadRetrySeeds(raw);
+                if (retrySeeds.Count == 0 && existingManifest?["retrySeeds"] is JsonArray existingRetrySeeds)
+                {
+                    retrySeeds = existingRetrySeeds.OfType<JsonValue>().Select(v => v.GetValue<int>()).ToList();
+                }
+
+                StampPayloadReplayFields(payloadPath, payloadNode, effectiveSeed, layoutRevisionId);
+                var manifestNode = BuildGenerationManifestNode(template, effectiveSeed, retrySeeds, layoutRevisionId, payloadNode, summaryNode, artifacts);
+                File.WriteAllText(manifestPath, manifestNode.ToJsonString() + Environment.NewLine);
+                AssetDatabase.Refresh();
+
+                return (true, MissionResultJson("PASS", template.MissionId, artifacts, findings));
+            }
+            catch (IOException)
+            {
+                findings.Add(Finding("error", "GENERATION_LOCK_CONFLICT", "Another mission generation writer holds the manifest lock", ToRepoPath(lockPath)));
+                return (false, MissionResultJson("FAIL", template!.MissionId, artifacts, findings));
+            }
+            finally
+            {
+                lockStream?.Dispose();
+                if (lockAcquired)
+                {
+                    TryDeleteFile(lockPath);
+                }
+            }
         }
 
         private static (bool Success, string? MissionId, string? TemplatePath, string? Error) ResolveContext(string raw)
@@ -1063,6 +1177,114 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["payloadPath"] = payloadPath,
                 ["findings"] = FindingsArray(findings)
             };
+        }
+
+        private static JsonObject BuildGenerationManifestNode(
+            MissionTemplateModel template,
+            int effectiveSeed,
+            IReadOnlyList<int> retrySeeds,
+            string layoutRevisionId,
+            JsonObject payloadNode,
+            JsonObject summaryNode,
+            IEnumerable<string> artifacts)
+        {
+            return new JsonObject
+            {
+                ["schemaVersion"] = "bse.generation_manifest.v2.2",
+                ["pipelineVersion"] = PipelineVersion,
+                ["missionId"] = template.MissionId,
+                ["status"] = "PASS",
+                ["requestedSeed"] = template.InitialSeed,
+                ["effectiveSeed"] = effectiveSeed,
+                ["retrySeeds"] = new JsonArray(retrySeeds.Select(s => (JsonNode?)JsonValue.Create(s)).ToArray()),
+                ["layoutRevisionId"] = layoutRevisionId,
+                ["lockOwner"] = "bse-pipeline",
+                ["profileRefs"] = (payloadNode["profileRefs"] as JsonObject)?.DeepClone() ?? template.ProfileRefs(),
+                ["artifacts"] = ManifestArtifactsObject(artifacts),
+                ["verification"] = new JsonObject
+                {
+                    ["status"] = summaryNode["status"]?.GetValue<string>() ?? "PASS",
+                    ["findings"] = (summaryNode["findings"] as JsonArray)?.DeepClone() ?? new JsonArray(),
+                    ["metrics"] = (summaryNode["metrics"] as JsonObject)?.DeepClone() ?? EmptyVerificationMetrics()
+                }
+            };
+        }
+
+        private static JsonObject ManifestArtifactsObject(IEnumerable<string> artifacts)
+        {
+            var unique = artifacts.Distinct(StringComparer.Ordinal).ToList();
+            var result = new JsonObject
+            {
+                ["payload"] = unique.FirstOrDefault(p => p.EndsWith("mission_payload.generated.json", StringComparison.Ordinal)) ?? "",
+                ["compileReport"] = unique.FirstOrDefault(p => p.EndsWith("mission_compile_report.json", StringComparison.Ordinal)) ?? "",
+                ["layout"] = unique.FirstOrDefault(p => p.EndsWith("mission_layout.generated.json", StringComparison.Ordinal)) ?? "",
+                ["entities"] = unique.FirstOrDefault(p => p.EndsWith("mission_entities.generated.json", StringComparison.Ordinal)) ?? "",
+                ["verificationSummary"] = unique.FirstOrDefault(p => p.EndsWith("verification_summary.json", StringComparison.Ordinal)) ?? ""
+            };
+            return result;
+        }
+
+        private static int ExistingAcceptedEffectiveSeed(JsonObject? existingManifest)
+        {
+            if (existingManifest == null)
+            {
+                return 0;
+            }
+
+            var status = existingManifest["status"]?.GetValue<string>() ?? "";
+            var seed = existingManifest["effectiveSeed"]?.GetValue<int>() ?? 0;
+            return string.Equals(status, "PASS", StringComparison.Ordinal) && seed > 0 ? seed : 0;
+        }
+
+        private static void StampPayloadReplayFields(string payloadPath, JsonObject payloadNode, int effectiveSeed, string layoutRevisionId)
+        {
+            if (payloadNode["header"] is JsonObject header)
+            {
+                header["effectiveSeed"] = effectiveSeed;
+                header["layoutRevisionId"] = layoutRevisionId;
+                File.WriteAllText(payloadPath, payloadNode.ToJsonString() + Environment.NewLine);
+            }
+        }
+
+        private static List<int> ReadRetrySeeds(string raw)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(raw);
+                var source = doc.RootElement;
+                if (source.TryGetProperty("arguments", out var args) && args.ValueKind == JsonValueKind.Object)
+                {
+                    source = args;
+                }
+
+                if (!source.TryGetProperty("retrySeeds", out var seeds) || seeds.ValueKind != JsonValueKind.Array)
+                {
+                    return new List<int>();
+                }
+
+                return seeds.EnumerateArray()
+                    .Where(seed => seed.ValueKind == JsonValueKind.Number && seed.TryGetInt32(out _))
+                    .Select(seed => seed.GetInt32())
+                    .ToList();
+            }
+            catch
+            {
+                return new List<int>();
+            }
+        }
+
+        private static void TryDeleteFile(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch
+            {
+            }
         }
 
         private static JsonArray FindingsArray(IEnumerable<JsonObject> findings)

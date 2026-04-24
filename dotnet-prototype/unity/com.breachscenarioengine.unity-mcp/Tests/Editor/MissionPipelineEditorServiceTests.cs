@@ -1,5 +1,7 @@
+using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using NUnit.Framework;
@@ -368,10 +370,208 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "NAV_OBJECTIVE_UNREACHABLE"));
         }
 
-        private static string RawArgs(string templatePath, string payloadPath = null, string layoutPath = null, string entitiesPath = null, string verificationPath = null)
+        [Test]
+        public void WriteManifest_AfterPassVerification_WritesReplayManifestAndStampsPayload()
+        {
+            var templatePath = Path.Combine(_testRoot, "manifest.template.yaml");
+            var payloadPath = Path.Combine(_testRoot, "mission_payload.generated.json");
+            var layoutPath = Path.Combine(_testRoot, "mission_layout.generated.json");
+            var entitiesPath = Path.Combine(_testRoot, "mission_entities.generated.json");
+            var summaryPath = Path.Combine(_testRoot, "verification_summary.json");
+            var manifestPath = Path.Combine(_testRoot, "generation_manifest.json");
+            File.WriteAllText(templatePath, ValidTemplate("VS90_ManifestMission"));
+
+            Assert.True(MissionPipelineEditorService.Execute("compile_payload", RawArgs(templatePath, payloadPath)).Success);
+            RewritePayloadProfileRefsToTempAssets(payloadPath);
+            Assert.True(MissionPipelineEditorService.Execute("generate_layout", RawArgs(templatePath, payloadPath, layoutPath)).Success);
+            Assert.True(MissionPipelineEditorService.Execute("place_entities", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath)).Success);
+            Assert.True(MissionPipelineEditorService.Execute("verify", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath, summaryPath)).Success);
+
+            var (success, message) = MissionPipelineEditorService.Execute("write_manifest", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath, summaryPath, manifestPath));
+
+            Assert.True(success, message);
+            Assert.True(File.Exists(manifestPath));
+            using var manifestDoc = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            var manifest = manifestDoc.RootElement;
+            Assert.AreEqual("bse.generation_manifest.v2.2", manifest.GetProperty("schemaVersion").GetString());
+            Assert.AreEqual("PASS", manifest.GetProperty("status").GetString());
+            Assert.AreEqual(42, manifest.GetProperty("requestedSeed").GetInt32());
+            Assert.AreEqual(42, manifest.GetProperty("effectiveSeed").GetInt32());
+            Assert.AreEqual("bse-pipeline", manifest.GetProperty("lockOwner").GetString());
+            Assert.AreEqual("PASS", manifest.GetProperty("verification").GetProperty("status").GetString());
+            Assert.AreEqual(ToRepoPath(payloadPath), manifest.GetProperty("artifacts").GetProperty("payload").GetString());
+            Assert.AreEqual(ToRepoPath(summaryPath), manifest.GetProperty("artifacts").GetProperty("verificationSummary").GetString());
+
+            using var payloadDoc = JsonDocument.Parse(File.ReadAllText(payloadPath));
+            var header = payloadDoc.RootElement.GetProperty("header");
+            Assert.AreEqual(42, header.GetProperty("effectiveSeed").GetInt32());
+            Assert.AreEqual(manifest.GetProperty("layoutRevisionId").GetString(), header.GetProperty("layoutRevisionId").GetString());
+        }
+
+        [Test]
+        public void WriteManifest_WhenVerificationFailed_DoesNotWriteManifest()
+        {
+            var templatePath = Path.Combine(_testRoot, "manifest-fail.template.yaml");
+            var summaryPath = Path.Combine(_testRoot, "verification_summary.json");
+            var manifestPath = Path.Combine(_testRoot, "generation_manifest.json");
+            File.WriteAllText(templatePath, ValidTemplate("VS89_ManifestFail"));
+            File.WriteAllText(summaryPath, new JsonObject
+            {
+                ["schemaVersion"] = "bse.verification_summary.v2.2",
+                ["pipelineVersion"] = "2.2",
+                ["missionId"] = "VS89_ManifestFail",
+                ["status"] = "FAIL",
+                ["layoutRevisionId"] = "layout_failed",
+                ["findings"] = new JsonArray(),
+                ["metrics"] = new JsonObject()
+            }.ToJsonString());
+
+            var (success, message) = MissionPipelineEditorService.Execute("write_manifest", RawArgs(templatePath, verificationPath: summaryPath, manifestPath: manifestPath));
+
+            Assert.False(success);
+            Assert.False(File.Exists(manifestPath));
+            using var doc = JsonDocument.Parse(message);
+            var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
+            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "MISSION_VERIFICATION_FAILED"));
+        }
+
+        [Test]
+        public void WriteManifest_WhenLockExists_ReturnsLockConflict()
+        {
+            var templatePath = Path.Combine(_testRoot, "manifest-lock.template.yaml");
+            var payloadPath = Path.Combine(_testRoot, "mission_payload.generated.json");
+            var layoutPath = Path.Combine(_testRoot, "mission_layout.generated.json");
+            var entitiesPath = Path.Combine(_testRoot, "mission_entities.generated.json");
+            var summaryPath = Path.Combine(_testRoot, "verification_summary.json");
+            var manifestPath = Path.Combine(_testRoot, "generation_manifest.json");
+            File.WriteAllText(templatePath, ValidTemplate("VS88_ManifestLock"));
+            Assert.True(MissionPipelineEditorService.Execute("compile_payload", RawArgs(templatePath, payloadPath)).Success);
+            RewritePayloadProfileRefsToTempAssets(payloadPath);
+            Assert.True(MissionPipelineEditorService.Execute("generate_layout", RawArgs(templatePath, payloadPath, layoutPath)).Success);
+            Assert.True(MissionPipelineEditorService.Execute("place_entities", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath)).Success);
+            Assert.True(MissionPipelineEditorService.Execute("verify", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath, summaryPath)).Success);
+            File.WriteAllText(manifestPath + ".lock", "held");
+
+            var (success, message) = MissionPipelineEditorService.Execute("write_manifest", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath, summaryPath, manifestPath));
+
+            Assert.False(success);
+            Assert.True(File.Exists(manifestPath + ".lock"));
+            using var doc = JsonDocument.Parse(message);
+            var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
+            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "GENERATION_LOCK_CONFLICT"));
+        }
+
+        [Test]
+        public void ManageMission_ThroughBridgeExecute_RoutesToMissionService()
+        {
+            var templatePath = Path.Combine(_testRoot, "bridge-route.template.yaml");
+            File.WriteAllText(templatePath, ValidTemplate("VS87_BridgeRoute"));
+            var execute = typeof(McpBridgeProcessor).GetMethod("Execute", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.NotNull(execute);
+
+            var result = (ValueTuple<bool, string>)execute.Invoke(null, new object[]
+            {
+                "manage_mission",
+                RawArgs(templatePath)
+            });
+
+            Assert.True(result.Item1, result.Item2);
+            using var doc = JsonDocument.Parse(result.Item2);
+            Assert.AreEqual("PASS", doc.RootElement.GetProperty("status").GetString());
+            Assert.AreEqual("VS87_BridgeRoute", doc.RootElement.GetProperty("missionId").GetString());
+        }
+
+        [Test]
+        public void ProjectCapabilities_ReportsAllMissionActionsSupported()
+        {
+            var execute = typeof(McpBridgeProcessor).GetMethod("Execute", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.NotNull(execute);
+
+            var result = (ValueTuple<bool, string>)execute.Invoke(null, new object[]
+            {
+                "project.capabilities",
+                "{}"
+            });
+
+            Assert.True(result.Item1, result.Item2);
+            using var doc = JsonDocument.Parse(result.Item2);
+            var missionActions = doc.RootElement.GetProperty("capabilities")
+                .EnumerateArray()
+                .Where(c => c.GetProperty("tool").GetString() == "manage_mission")
+                .ToArray();
+            var expected = new[]
+            {
+                "validate_template",
+                "compile_payload",
+                "generate_layout",
+                "place_entities",
+                "verify",
+                "write_manifest"
+            };
+
+            foreach (var action in expected)
+            {
+                var capability = missionActions.Single(c => c.GetProperty("action").GetString() == action);
+                Assert.True(capability.GetProperty("supported").GetBoolean(), action);
+            }
+        }
+
+        [Test]
+        public void Pipeline_WithDefaultMissionPaths_CreatesExpectedArtifacts()
+        {
+            var missionId = "VS86_DefaultPaths";
+            var missionDir = Path.Combine(ProjectRoot(), "UserMissionSources", "missions", missionId);
+            if (Directory.Exists(missionDir))
+            {
+                Directory.Delete(missionDir, recursive: true);
+            }
+
+            try
+            {
+                Directory.CreateDirectory(missionDir);
+                var templatePath = Path.Combine(missionDir, "mission_design.template.yaml");
+                File.WriteAllText(templatePath, ValidTemplate(missionId));
+                var raw = "{ \"missionId\": \"" + missionId + "\" }";
+
+                Assert.True(MissionPipelineEditorService.Execute("compile_payload", raw).Success);
+                RewritePayloadProfileRefsToTempAssets(Path.Combine(missionDir, "mission_payload.generated.json"));
+                Assert.True(MissionPipelineEditorService.Execute("generate_layout", raw).Success);
+                Assert.True(MissionPipelineEditorService.Execute("place_entities", raw).Success);
+                Assert.True(MissionPipelineEditorService.Execute("verify", raw).Success);
+                var (success, message) = MissionPipelineEditorService.Execute("write_manifest", raw);
+
+                Assert.True(success, message);
+                var expectedArtifacts = new[]
+                {
+                    "mission_payload.generated.json",
+                    "mission_compile_report.json",
+                    "mission_layout.generated.json",
+                    "mission_entities.generated.json",
+                    "verification_summary.json",
+                    "generation_manifest.json"
+                };
+                foreach (var artifact in expectedArtifacts)
+                {
+                    Assert.True(File.Exists(Path.Combine(missionDir, artifact)), artifact);
+                }
+
+                using var doc = JsonDocument.Parse(message);
+                var artifacts = doc.RootElement.GetProperty("artifacts").EnumerateArray().Select(a => a.GetString()).ToArray();
+                Assert.Contains("UserMissionSources/missions/VS86_DefaultPaths/generation_manifest.json", artifacts);
+            }
+            finally
+            {
+                if (Directory.Exists(missionDir))
+                {
+                    Directory.Delete(missionDir, recursive: true);
+                }
+            }
+        }
+
+        private static string RawArgs(string templatePath, string payloadPath = null, string layoutPath = null, string entitiesPath = null, string verificationPath = null, string manifestPath = null)
         {
             var template = ToRepoPath(templatePath);
-            if (payloadPath == null && layoutPath == null && entitiesPath == null && verificationPath == null)
+            if (payloadPath == null && layoutPath == null && entitiesPath == null && verificationPath == null && manifestPath == null)
             {
                 return "{ \"templatePath\": \"" + template + "\" }";
             }
@@ -395,6 +595,11 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             if (verificationPath != null)
             {
                 json += ", \"verificationPath\": \"" + ToRepoPath(verificationPath) + "\"";
+            }
+
+            if (manifestPath != null)
+            {
+                json += ", \"manifestPath\": \"" + ToRepoPath(manifestPath) + "\"";
             }
 
             return json + " }";
