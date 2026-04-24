@@ -32,7 +32,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                 "compile_payload" => CompilePayload(raw),
                 "generate_layout" => GenerateLayout(raw),
                 "place_entities" => PlaceEntities(raw),
-                "verify" => NotImplemented(action),
+                "verify" => Verify(raw),
                 "write_manifest" => NotImplemented(action),
                 _ => (false, MissionResultJson("FAIL", "", Array.Empty<string>(), new[]
                 {
@@ -219,6 +219,83 @@ namespace BreachScenarioEngine.Mcp.Editor
             AssetDatabase.Refresh();
 
             return (true, MissionResultJson("PASS", template.MissionId, new[] { ToRepoPath(layoutPath), ToRepoPath(entitiesPath) }, findings));
+        }
+
+        private static (bool Success, string Message) Verify(string raw)
+        {
+            var context = ResolveContext(raw);
+            if (!context.Success)
+            {
+                return (false, context.Error!);
+            }
+
+            if (!MissionTemplateModel.TryLoad(context.TemplatePath!, context.MissionId, out var template, out var findings))
+            {
+                return (false, MissionResultJson("FAIL", context.MissionId ?? template?.MissionId ?? "", new[] { ToRepoPath(context.TemplatePath!) }, findings));
+            }
+
+            var missionDir = Path.GetDirectoryName(context.TemplatePath!)!;
+            var payloadPath = ResolveMissionArtifactPath(raw, "payloadPath", missionDir, "mission_payload.generated.json");
+            var layoutPath = ResolveMissionArtifactPath(raw, "layoutPath", missionDir, "mission_layout.generated.json");
+            var entitiesPath = ResolveMissionArtifactPath(raw, "entitiesPath", missionDir, "mission_entities.generated.json");
+            var summaryPath = ResolveMissionArtifactPath(raw, "verificationPath", missionDir, "verification_summary.json");
+            if (!IsUnderProjectRoot(payloadPath) || !IsUnderProjectRoot(layoutPath) || !IsUnderProjectRoot(entitiesPath) || !IsUnderProjectRoot(summaryPath))
+            {
+                return (false, MissionResultJson("FAIL", template!.MissionId, new[] { ToRepoPath(context.TemplatePath!) }, new[]
+                {
+                    Finding("error", "VERIFICATION_PATH_OUTSIDE_PROJECT", "verification artifact paths must stay inside the Unity project root")
+                }));
+            }
+
+            var artifacts = new List<string> { ToRepoPath(payloadPath), ToRepoPath(layoutPath), ToRepoPath(entitiesPath), ToRepoPath(summaryPath) };
+            var layoutNode = ReadJsonObject(layoutPath);
+            var entitiesNode = ReadJsonObject(entitiesPath);
+            var payloadNode = ReadJsonObject(payloadPath);
+            var expectedRevisionId = ComputeLayoutRevisionId(template!);
+            var metrics = EmptyVerificationMetrics();
+
+            if (payloadNode == null)
+            {
+                findings.Add(Finding("error", "PAYLOAD_FILE_MISSING", "verify requires mission_payload.generated.json from compile_payload", ToRepoPath(payloadPath)));
+            }
+
+            if (layoutNode == null || layoutNode["LayoutGraph"] is not JsonObject || layoutNode["RoomGraph"] is not JsonObject)
+            {
+                findings.Add(Finding("error", "ORDER_VIOLATION_NO_LAYOUT_GRAPH", "verify requires a readable LayoutGraph and RoomGraph from generate_layout", ToRepoPath(layoutPath)));
+            }
+
+            if (entitiesNode == null || entitiesNode["actors"] is not JsonArray || entitiesNode["objectives"] is not JsonArray)
+            {
+                findings.Add(Finding("error", "ORDER_VIOLATION_NO_ENTITY_PLACEMENT", "verify requires mission_entities.generated.json from place_entities", ToRepoPath(entitiesPath)));
+            }
+
+            if (layoutNode != null && !string.Equals(layoutNode["layoutRevisionId"]?.GetValue<string>(), expectedRevisionId, StringComparison.Ordinal))
+            {
+                findings.Add(Finding("error", "ORDER_VIOLATION_STALE_LAYOUT_GRAPH", "verify requires the current layoutRevisionId from generate_layout", ToRepoPath(layoutPath)));
+            }
+
+            if (entitiesNode != null && !string.Equals(entitiesNode["layoutRevisionId"]?.GetValue<string>(), expectedRevisionId, StringComparison.Ordinal))
+            {
+                findings.Add(Finding("error", "ORDER_VIOLATION_STALE_ENTITY_PLACEMENT", "verify requires entity placement generated from the current layoutRevisionId", ToRepoPath(entitiesPath)));
+            }
+
+            if (payloadNode != null)
+            {
+                ValidateProfileRefs(payloadNode, findings);
+            }
+
+            if (layoutNode != null && entitiesNode != null)
+            {
+                metrics = ComputeVerificationMetrics(layoutNode, entitiesNode, findings);
+            }
+
+            var status = findings.Any(f => string.Equals(f["severity"]?.GetValue<string>(), "error", StringComparison.Ordinal)) ? "FAIL" : "PASS";
+            var summary = BuildVerificationSummaryNode(template.MissionId, status, layoutNode?["layoutRevisionId"]?.GetValue<string>() ?? expectedRevisionId, artifacts, findings, metrics);
+            Directory.CreateDirectory(Path.GetDirectoryName(summaryPath)!);
+            File.WriteAllText(summaryPath, summary.ToJsonString() + Environment.NewLine);
+            AssetDatabase.Refresh();
+
+            return (status == "PASS", MissionResultJson(status, template.MissionId, artifacts, findings));
         }
 
         private static (bool Success, string? MissionId, string? TemplatePath, string? Error) ResolveContext(string raw)
