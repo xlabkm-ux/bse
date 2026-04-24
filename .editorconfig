@@ -1,0 +1,42 @@
+root = true
+
+[*.{cs,csx}]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+[*.{json,yml,yaml,md}]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+[*.shader]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+tab_width = 4
+
+[*.uxml]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+indent_style = space
+indent_size = 2
+tab_width = 2
+
+[*.uss]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+indent_style = space
+indent_size = 2
+tab_width = 2
+

@@ -2,23 +2,32 @@
 
 Initial project scaffold for **TACTICAL BREACH: Mission Architect / Breach Scenario Engine**.
 
-## What is here
+## Project Layout
 
-- Unity project skeleton
-- Mission source folders under `UserMissionSources/`
-- Starter mission template aligned with the v1.4 mission architecture
-- Git ignore rules for generated Unity and pipeline artifacts
+- `Assets/` - Unity runtime and editor content
+- `Assets/Scripts/` - gameplay and generation code
+- `Assets/Editor/` - editor tooling and MCP integration
+- `UserMissionSources/` - mission authoring inputs and generated mission artifacts
+- `Docs/` - supporting notes and technical references
+- `Packages/manifest.json` - Unity package manifest
+- `ProjectSettings/` - Unity project configuration
 
-## Reference workflow
+## Mission Workflow
 
 1. Fill a mission template in `UserMissionSources/missions/<missionId>/mission_design.template.yaml`
 2. Validate and compile it into `mission_payload.generated.json`
 3. Run the MCP / Unity generation pipeline
 4. Store deterministic outputs in the mission folder
 
-## Next steps
+## Standards
 
-- Open the project in Unity 6
-- Add the actual runtime assemblies and Editor tooling
+- C# uses 4-space indentation.
+- YAML, JSON, Markdown, UXML, and USS use 2-space indentation.
+- Source files are normalized through `.editorconfig`.
+- Generated mission artifacts are ignored through `.gitignore`.
+
+## Next Steps
+
+- Add runtime assemblies under `Assets/Scripts/`
+- Add MCP/editor tooling under `Assets/Editor/`
 - Connect the mission compiler and verification pipeline
-
