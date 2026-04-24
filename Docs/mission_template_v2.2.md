@@ -113,9 +113,4 @@ Any of the following conditions must stop generation or trigger a seed retry.
 
 ## 7. Migration Guide
 
-Migration from v1.4 to v2.2 requires:
-
-1. Use `tb.mission_template.v2.2` as the active schema version.
-2. Replace descriptive acoustic notes with `acousticOcclusion` parameters.
-3. Enable `forceRoomAdjacency` to avoid broken NavMesh layouts.
-4. Persist the resolved `effectiveSeed` in the generation manifest.
+Use `tb.mission_template.v2.2` as the active schema version.

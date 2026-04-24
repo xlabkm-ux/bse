@@ -12,7 +12,7 @@ Short entry point for the active Breach Scenario Engine MCP documentation.
 | [runtime_tools.md](runtime_tools.md) | Actual tools exposed by the current runtime |
 | [breach_mcp_verification_contract.md](breach_mcp_verification_contract.md) | Required verification payloads and resources |
 | [breach_mcp_server_backlog.md](breach_mcp_server_backlog.md) | Remaining server tasks and status |
-| [Archive/README.md](Archive/README.md) | Historical notes and retired prototype docs |
+| [Archive/README.md](Archive/README.md) | Archive index |
 
 ## Quick use
 

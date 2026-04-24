@@ -70,7 +70,6 @@ and server-side workflow are supposed to be used.
 ### Historical archive
 
 - [Docs/Archive/README.md](Archive/README.md)
-  - Historical notes and removed prototype docs
 
 ## 2. Recommended Reading Order
 
@@ -81,7 +80,7 @@ and server-side workflow are supposed to be used.
 5. [Docs/breach_mcp_verification_contract.md](breach_mcp_verification_contract.md)
 6. [Docs/breach_mcp_server_backlog.md](breach_mcp_server_backlog.md)
 7. [mcp/README.md](../mcp/README.md)
-8. [Docs/Archive/README.md](Archive/README.md) only if you need history
+8. [Docs/Archive/README.md](Archive/README.md)
 
 ## 3. Runtime Snapshot
 

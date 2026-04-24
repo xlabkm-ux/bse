@@ -9,11 +9,7 @@ Bridge target: Unity Editor + `Library/BreachMcpBridge`
 
 Convert the current Breach Scenario Engine MCP bridge/server into a stable Unity-native automation layer that lets the Codex agent run gameplay development and verification without manual Editor clicking.
 
-This backlog is based on the legacy notes below, which are now archived:
-
-- `Archive/2026-04-06/mcp_server_gaps.md`
-- `Archive/2026-04-06/mcp_step2_readiness_checklist.md`
-- `Archive/2026-04-06/mcp_tools_by_step.md`
+Legacy source notes are archived in `Archive/2026-04-06/`.
 
 It remains aligned with the active Unity verification contract and canonical tools list:
 
@@ -326,7 +322,7 @@ Confirmed weak areas:
 - Complexity: `M`
 - Status: completed
 - Goal: align old project docs/tool names with the canonical tools list
-- Why: we still carry historical aliases that must not leak into active documentation
+- Why: active documentation must not leak legacy aliases
 - Deliverables:
   - server help output
   - docs update guidance
