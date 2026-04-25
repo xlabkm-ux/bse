@@ -93,9 +93,19 @@ generator.
 
 Target files:
 
+- `Packages/com.breachscenarioengine.unity-mcp/Editor/BspLayoutGenerator.cs`
+  while `manage_mission` remains hosted in the active Unity MCP package
 - `Assets/Scripts/Generation/Layout/BspLayoutGenerator.cs`
 - `Assets/Scripts/Generation/Layout/RoomGraphBuilder.cs`
 - `Assets/Scripts/Generation/Layout/PortalGraphBuilder.cs`
+
+Implementation note:
+
+- Transfer Session 2 implemented the first BSP slice in the active Unity MCP
+  editor package so it can replace the existing `manage_mission` layout path
+  without introducing a new runtime assembly dependency. Later transfer work
+  may move the pure generator into `Assets/Scripts/Generation/Layout/` once the
+  assembly boundary is chosen.
 
 Inputs:
 

@@ -159,8 +159,10 @@ namespace BreachScenarioEngine.Mcp.Editor
             Directory.CreateDirectory(missionDir);
             Directory.CreateDirectory(Path.GetDirectoryName(layoutPath)!);
 
-            var layoutNode = BuildLayoutNode(template!);
             var payloadPath = ResolveMissionArtifactPath(raw, "payloadPath", missionDir, "mission_payload.generated.json");
+            var payloadNode = File.Exists(payloadPath) && IsUnderProjectRoot(payloadPath) ? ReadJsonObject(payloadPath) : null;
+            var generationSeed = PayloadGenerationSeed(payloadNode, template.InitialSeed);
+            var layoutNode = BuildLayoutNode(template!, generationSeed, File.Exists(payloadPath) && IsUnderProjectRoot(payloadPath) ? ToRepoPath(payloadPath) : "");
             if (File.Exists(payloadPath) && IsUnderProjectRoot(payloadPath))
             {
                 TryStampPayloadLayoutRevision(payloadPath, layoutNode["layoutRevisionId"]!.GetValue<string>());
@@ -678,56 +680,46 @@ namespace BreachScenarioEngine.Mcp.Editor
 
         private static JsonObject BuildLayoutNode(MissionTemplateModel template)
         {
-            return BuildLayoutNode(template, template.InitialSeed);
+            return BuildLayoutNode(template, template.InitialSeed, "");
         }
 
         private static JsonObject BuildLayoutNode(MissionTemplateModel template, int generationSeed)
         {
-            var revisionId = ComputeLayoutRevisionId(template, generationSeed);
-            var rooms = BuildRooms(template, revisionId);
-            var portals = BuildPortals(revisionId, rooms);
-            var coverPoints = BuildCoverPoints(revisionId, rooms, template);
+            return BuildLayoutNode(template, generationSeed, "");
+        }
 
-            return new JsonObject
+        private static JsonObject BuildLayoutNode(MissionTemplateModel template, int generationSeed, string sourcePayloadPath)
+        {
+            var revisionId = ComputeLayoutRevisionId(template, generationSeed);
+            return BspLayoutGenerator.Generate(new BspLayoutGenerator.Options
             {
-                ["schemaVersion"] = "bse.mission_layout.v2.3",
-                ["pipelineVersion"] = PipelineVersion,
-                ["missionId"] = template.MissionId,
-                ["layoutRevisionId"] = revisionId,
-                ["requestedSeed"] = template.InitialSeed,
-                ["generationSeed"] = generationSeed,
-                ["retryPolicy"] = new JsonObject
-                {
-                    ["retryFromStep"] = 6,
-                    ["retryAction"] = "generate_layout",
-                    ["placementStep"] = 5
-                },
-                ["LayoutGraph"] = new JsonObject
-                {
-                    ["layoutRevisionId"] = revisionId,
-                    ["bounds"] = IntArrayNode(template.WorldBounds),
-                    ["theme"] = template.TacticalTheme,
-                    ["entryRoomId"] = "room_entry",
-                    ["objectiveRoomIds"] = new JsonArray(rooms.Select(r => r["id"]!.GetValue<string>()).Where(id => id.Contains("vault", StringComparison.Ordinal)).Select(id => (JsonNode?)id).ToArray())
-                },
-                ["RoomGraph"] = new JsonObject
-                {
-                    ["layoutRevisionId"] = revisionId,
-                    ["rooms"] = new JsonArray(rooms.Select(r => (JsonNode?)r.DeepClone()).ToArray())
-                },
-                ["PortalGraph"] = new JsonObject
-                {
-                    ["layoutRevisionId"] = revisionId,
-                    ["portals"] = new JsonArray(portals.Select(p => (JsonNode?)p).ToArray())
-                },
-                ["CoverGraph"] = new JsonObject
-                {
-                    ["layoutRevisionId"] = revisionId,
-                    ["coverPoints"] = new JsonArray(coverPoints.Select(c => (JsonNode?)c).ToArray())
-                },
-                ["VisibilityGraph"] = BuildVisibilityGraph(revisionId, rooms),
-                ["HearingGraph"] = BuildHearingGraph(template, revisionId, rooms)
-            };
+                PipelineVersion = PipelineVersion,
+                MissionId = template.MissionId,
+                LayoutRevisionId = revisionId,
+                RequestedSeed = template.InitialSeed,
+                GenerationSeed = generationSeed,
+                Bounds = template.WorldBounds,
+                Theme = template.TacticalTheme,
+                PixelsPerUnit = template.PixelsPerUnit,
+                MinRoomSize = template.MinRoomSize,
+                MaxRoomSize = template.MaxRoomSize,
+                CorridorWidth = template.CorridorWidth,
+                ForceAdjacency = template.ForceRoomAdjacency,
+                WallMultiplier = template.WallMultiplier,
+                DoorPenalty = template.DoorPenalty,
+                CoverBudget = template.Actors
+                    .Where(actor => actor.Type.Contains("Sentry", StringComparison.OrdinalIgnoreCase) ||
+                                    actor.Type.Contains("Roamer", StringComparison.OrdinalIgnoreCase) ||
+                                    actor.Type.Contains("Enemy", StringComparison.OrdinalIgnoreCase))
+                    .Sum(actor => actor.NormalizedCount),
+                ObjectiveRoomTags = template.PrimaryObjectives
+                    .Concat(template.SecondaryObjectives)
+                    .Select(objective => objective.TargetRoomTag)
+                    .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray(),
+                SourcePayloadPath = sourcePayloadPath
+            });
         }
 
         private static List<JsonObject> BuildRooms(MissionTemplateModel template, string revisionId)
@@ -1035,6 +1027,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             var source = new JsonObject
             {
                 ["pipelineVersion"] = PipelineVersion,
+                ["layoutGenerator"] = BspLayoutGenerator.GeneratorId,
                 ["missionId"] = template.MissionId,
                 ["requestedSeed"] = generationSeed,
                 ["bounds"] = IntArrayNode(template.WorldBounds),
@@ -1060,6 +1053,18 @@ namespace BreachScenarioEngine.Mcp.Editor
             try
             {
                 return layoutNode["generationSeed"]?.GetValue<int>() ?? fallbackSeed;
+            }
+            catch
+            {
+                return fallbackSeed;
+            }
+        }
+
+        private static int PayloadGenerationSeed(JsonObject? payloadNode, int fallbackSeed)
+        {
+            try
+            {
+                return payloadNode?["header"]?["initialSeed"]?.GetValue<int>() ?? fallbackSeed;
             }
             catch
             {
@@ -2702,4 +2707,3 @@ namespace BreachScenarioEngine.Mcp.Editor
         }
     }
 }
-

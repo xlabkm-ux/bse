@@ -74,6 +74,21 @@ Failure examples:
 - `PrefabUtility.InstantiatePrefab` inside Step 6
 - actor placement before `mission_layout.generated.json` exists
 
+Transfer Session 2 implementation record:
+
+- active target:
+  `Packages/com.breachscenarioengine.unity-mcp/Editor/BspLayoutGenerator.cs`
+- source-copy target:
+  `dotnet-prototype/unity/com.breachscenarioengine.unity-mcp/Editor/BspLayoutGenerator.cs`
+- public entry point remains `manage_mission(action="generate_layout")`
+- the generator emits rooms, internal door portals, perimeter windows, breach
+  points, cover candidates, visibility edges, and hearing edges as pure JSON
+  data
+- live MCP validation passed for VS01 after AssetDatabase refresh:
+  `generate_layout`, `place_entities`, and `verify`
+- Unity batchmode EditMode test validation is pending because the project was
+  already open in another Unity instance during the implementation session
+
 ## 4. Placement Acceptance
 
 The migrated placement layer is accepted when:

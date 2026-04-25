@@ -107,7 +107,7 @@ Handoff note:
 
 Status:
 
-- pending
+- completed
 
 Goal:
 
@@ -133,6 +133,52 @@ Exit criteria:
   layout data
 - repeated generation with the same payload and seed is stable
 - Step 5 remains blocked without a current layout
+
+Completed:
+
+- added a pure `BspLayoutGenerator` in the active Unity MCP editor package
+  under `Packages/com.breachscenarioengine.unity-mcp/Editor/`
+- kept the source-copy package under
+  `dotnet-prototype/unity/com.breachscenarioengine.unity-mcp/Editor/` in sync
+- replaced the temporary fixed four-room `BuildLayoutNode` path with the BSP
+  generator call while leaving `manage_mission(action="generate_layout")` as
+  the public entry point
+- generation now emits BSP rooms, deterministic internal portals, perimeter
+  windows, breach points, cover candidates, visibility edges, and hearing edges
+  as JSON-only Step 6 data
+- `layoutRevisionId` now includes the generator id, payload seed, BSP
+  constraints, and primary objective shape so identical inputs remain stable
+  and generator changes invalidate stale layouts
+- `generate_layout` reads `mission_payload.generated.json` when present and
+  uses `header.initialSeed` as the Step 6 generation seed
+- expanded editor tests to assert BSP generator identity, more than four rooms,
+  windows, breach points, non-empty portals, and stable repeated generation
+- confirmed the new BSP generator source contains no `Tilemap`,
+  `PrefabUtility`, `GameObject.Find`, `Resources`, `AssetDatabase`, or NavMesh
+  calls
+
+Verification:
+
+- Unity batchmode EditMode test execution was attempted with
+  `Unity.exe -batchmode -runTests`, but Unity returned:
+  `It looks like another Unity instance is running with this project open.`
+- after `manage_asset(action="refresh")`, live MCP
+  `manage_mission(action="generate_layout")` produced
+  `pure_bsp_layout_v1` output for `VS01_HostageApartment`
+- repeated live generation for VS01 kept `layoutRevisionId: layout_9f491a30`
+  and SHA-256
+  `B790E6A6AAFB1D307080755B200ACBD9900B1179ECA626112AEEEC6DA1BA3FAC`
+- live `place_entities` and `verify` passed for VS01 after capping initial
+  hearing edges to the current Step 7 budget
+
+Handoff note:
+
+- "Pure BSP layout code is in the active Unity MCP package and live VS01
+  `generate_layout` / `place_entities` / `verify` pass after AssetDatabase
+  refresh. Batchmode EditMode tests are still blocked while another Unity
+  instance has the project open. Continue Transfer Session 3 by moving cover,
+  visibility, hearing, and pressure heuristics out of the layout generator into
+  dedicated tactical graph builders."
 
 ### Transfer Session 3: Tactical Graphs and Cover Heuristics
 
