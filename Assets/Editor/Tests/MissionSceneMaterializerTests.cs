@@ -103,6 +103,66 @@ namespace BreachScenarioEngine.Editor.Tests
             }
         }
 
+        [Test]
+        public void MaterializeFailsOnStaleEntitiesLayoutRevision()
+        {
+            var bundle = CreatePreviewBundle();
+            bundle.Entities.layoutRevisionId = "layout_stale";
+
+            try
+            {
+                var report = MissionSceneMaterializer.Materialize(bundle.Context, bundle.Config, bundle.Manifest, bundle.Layout, bundle.Entities);
+
+                Assert.AreEqual("FAIL", report.status);
+                Assert.AreEqual("SCENE_LAYOUT_REVISION_MISMATCH", report.findings[0].code);
+                Assert.AreEqual("Layout revision id mismatch for entities.", report.findings[0].message);
+            }
+            finally
+            {
+                DestroyBundle(bundle);
+            }
+        }
+
+        [Test]
+        public void MaterializeFailsOnStaleLayoutGraphRevision()
+        {
+            var bundle = CreatePreviewBundle();
+            bundle.Layout.PortalGraph.layoutRevisionId = "layout_stale";
+
+            try
+            {
+                var report = MissionSceneMaterializer.Materialize(bundle.Context, bundle.Config, bundle.Manifest, bundle.Layout, bundle.Entities);
+
+                Assert.AreEqual("FAIL", report.status);
+                Assert.AreEqual("SCENE_LAYOUT_REVISION_MISMATCH", report.findings[0].code);
+                Assert.AreEqual("Layout revision id mismatch for portal graph.", report.findings[0].message);
+            }
+            finally
+            {
+                DestroyBundle(bundle);
+            }
+        }
+
+        [Test]
+        public void MaterializeFailsOnMissionIdMismatch()
+        {
+            var bundle = CreatePreviewBundle();
+            bundle.Layout.missionId = "TEST_OtherMission";
+
+            try
+            {
+                var report = MissionSceneMaterializer.Materialize(bundle.Context, bundle.Config, bundle.Manifest, bundle.Layout, bundle.Entities);
+
+                Assert.AreEqual("FAIL", report.status);
+                Assert.AreEqual("SCENE_MISSION_ID_MISMATCH", report.findings[0].code);
+                Assert.AreEqual("Mission id mismatch for layout.", report.findings[0].message);
+            }
+            finally
+            {
+                DestroyBundle(bundle);
+            }
+        }
+
         private static PreviewBundle CreatePreviewBundle()
         {
             var missionId = "TEST_Materializer";
@@ -256,8 +316,51 @@ namespace BreachScenarioEngine.Editor.Tests
                 layoutRevisionId = layoutRevisionId,
                 placementStep = 5,
                 requiresLayoutStep = 6,
-                actors = Array.Empty<MissionActorEntity>(),
-                objectives = Array.Empty<MissionObjectiveEntity>()
+                actors = new[]
+                {
+                    new MissionActorEntity
+                    {
+                        entityId = "enemy_1",
+                        kind = "actor",
+                        sourceActorId = "enemy",
+                        type = "Enemy",
+                        roomId = "room_a",
+                        navNodeId = "nav_room_a",
+                        layoutRevisionId = layoutRevisionId,
+                        ownership = new MissionOwnership
+                        {
+                            owner = "bse-pipeline",
+                            generatedBy = "test",
+                            missionId = missionId,
+                            entityId = "enemy_1",
+                            sourceId = "enemy",
+                            layoutRevisionId = layoutRevisionId,
+                            stableKey = layoutRevisionId + ":enemy_1"
+                        }
+                    }
+                },
+                objectives = new[]
+                {
+                    new MissionObjectiveEntity
+                    {
+                        entityId = "objective_1",
+                        kind = "objective",
+                        type = "Secure",
+                        roomId = "room_a",
+                        navNodeId = "nav_room_a",
+                        layoutRevisionId = layoutRevisionId,
+                        ownership = new MissionOwnership
+                        {
+                            owner = "bse-pipeline",
+                            generatedBy = "test",
+                            missionId = missionId,
+                            entityId = "objective_1",
+                            sourceId = "objective_1",
+                            layoutRevisionId = layoutRevisionId,
+                            stableKey = layoutRevisionId + ":objective_1"
+                        }
+                    }
+                }
             };
 
             return new PreviewBundle(root, context, config, manifest, layout, entities, enemyCatalog, environmentCatalog, objectiveCatalog);

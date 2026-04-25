@@ -109,6 +109,7 @@ namespace BreachScenarioEngine.Runtime
                 return Complete(report, findings, artifacts, "Entities artifact is missing or unreadable.");
             }
 
+            ValidateArtifactConsistency(config, manifest, layout, entities, findings);
             ValidateLayoutGeometry(layout, findings, config.LayoutPath);
             ValidateCatalogRefs(config, findings, artifacts);
             if (findings.Count > 0)
@@ -391,6 +392,108 @@ namespace BreachScenarioEngine.Runtime
             ValidateCatalogAsset(config.EnemyCatalog, "enemyCatalog", findings, artifacts);
             ValidateCatalogAsset(config.EnvironmentCatalog, "environmentCatalog", findings, artifacts);
             ValidateCatalogAsset(config.ObjectiveCatalog, "objectiveCatalog", findings, artifacts);
+        }
+
+        private static void ValidateArtifactConsistency(
+            MissionConfig config,
+            MissionManifest manifest,
+            MissionLayout layout,
+            MissionEntities entities,
+            List<MissionSceneMaterializationFinding> findings)
+        {
+            var expectedMissionId = config != null ? config.MissionId : "";
+            if (string.IsNullOrWhiteSpace(expectedMissionId))
+            {
+                expectedMissionId = manifest != null ? manifest.missionId : "";
+            }
+
+            ValidateMissionId(expectedMissionId, manifest != null ? manifest.missionId : "", "manifest", config != null ? config.GenerationManifestPath : "", findings);
+            ValidateMissionId(expectedMissionId, layout != null ? layout.missionId : "", "layout", config != null ? config.LayoutPath : "", findings);
+            ValidateMissionId(expectedMissionId, entities != null ? entities.missionId : "", "entities", config != null ? config.EntitiesPath : "", findings);
+
+            var expectedLayoutRevisionId = manifest != null ? manifest.layoutRevisionId : "";
+            if (string.IsNullOrWhiteSpace(expectedLayoutRevisionId))
+            {
+                expectedLayoutRevisionId = layout != null ? layout.layoutRevisionId : "";
+            }
+
+            ValidateLayoutRevision(expectedLayoutRevisionId, layout != null ? layout.layoutRevisionId : "", "layout", config != null ? config.LayoutPath : "", findings);
+            ValidateLayoutRevision(expectedLayoutRevisionId, entities != null ? entities.layoutRevisionId : "", "entities", config != null ? config.EntitiesPath : "", findings);
+            ValidateLayoutGraphRevision(expectedLayoutRevisionId, layout, config != null ? config.LayoutPath : "", findings);
+            ValidateEntityRevision(expectedLayoutRevisionId, entities, config != null ? config.EntitiesPath : "", findings);
+        }
+
+        private static void ValidateMissionId(string expectedMissionId, string artifactMissionId, string artifactName, string artifactPath, List<MissionSceneMaterializationFinding> findings)
+        {
+            if (string.IsNullOrWhiteSpace(expectedMissionId) || string.IsNullOrWhiteSpace(artifactMissionId))
+            {
+                findings.Add(Finding("SCENE_MISSION_ID_MISSING", "Mission id is missing for " + artifactName + ".", artifactPath));
+                return;
+            }
+
+            if (!string.Equals(expectedMissionId, artifactMissionId, StringComparison.Ordinal))
+            {
+                findings.Add(Finding("SCENE_MISSION_ID_MISMATCH", "Mission id mismatch for " + artifactName + ".", artifactPath));
+            }
+        }
+
+        private static void ValidateLayoutRevision(string expectedLayoutRevisionId, string artifactLayoutRevisionId, string artifactName, string artifactPath, List<MissionSceneMaterializationFinding> findings)
+        {
+            if (string.IsNullOrWhiteSpace(expectedLayoutRevisionId) || string.IsNullOrWhiteSpace(artifactLayoutRevisionId))
+            {
+                findings.Add(Finding("SCENE_LAYOUT_REVISION_MISSING", "Layout revision id is missing for " + artifactName + ".", artifactPath));
+                return;
+            }
+
+            if (!string.Equals(expectedLayoutRevisionId, artifactLayoutRevisionId, StringComparison.Ordinal))
+            {
+                findings.Add(Finding("SCENE_LAYOUT_REVISION_MISMATCH", "Layout revision id mismatch for " + artifactName + ".", artifactPath));
+            }
+        }
+
+        private static void ValidateLayoutGraphRevision(string expectedLayoutRevisionId, MissionLayout layout, string artifactPath, List<MissionSceneMaterializationFinding> findings)
+        {
+            if (layout == null)
+            {
+                return;
+            }
+
+            ValidateLayoutRevision(expectedLayoutRevisionId, layout.LayoutGraph != null ? layout.LayoutGraph.layoutRevisionId : "", "layout graph", artifactPath, findings);
+            ValidateLayoutRevision(expectedLayoutRevisionId, layout.RoomGraph != null ? layout.RoomGraph.layoutRevisionId : "", "room graph", artifactPath, findings);
+            ValidateLayoutRevision(expectedLayoutRevisionId, layout.PortalGraph != null ? layout.PortalGraph.layoutRevisionId : "", "portal graph", artifactPath, findings);
+            ValidateLayoutRevision(expectedLayoutRevisionId, layout.CoverGraph != null ? layout.CoverGraph.layoutRevisionId : "", "cover graph", artifactPath, findings);
+            ValidateLayoutRevision(expectedLayoutRevisionId, layout.VisibilityGraph != null ? layout.VisibilityGraph.layoutRevisionId : "", "visibility graph", artifactPath, findings);
+            ValidateLayoutRevision(expectedLayoutRevisionId, layout.HearingGraph != null ? layout.HearingGraph.layoutRevisionId : "", "hearing graph", artifactPath, findings);
+        }
+
+        private static void ValidateEntityRevision(string expectedLayoutRevisionId, MissionEntities entities, string artifactPath, List<MissionSceneMaterializationFinding> findings)
+        {
+            if (entities == null)
+            {
+                return;
+            }
+
+            if (entities.actors != null)
+            {
+                foreach (var actor in entities.actors)
+                {
+                    if (actor != null)
+                    {
+                        ValidateLayoutRevision(expectedLayoutRevisionId, actor.layoutRevisionId, "actor " + actor.entityId, artifactPath, findings);
+                    }
+                }
+            }
+
+            if (entities.objectives != null)
+            {
+                foreach (var objective in entities.objectives)
+                {
+                    if (objective != null)
+                    {
+                        ValidateLayoutRevision(expectedLayoutRevisionId, objective.layoutRevisionId, "objective " + objective.entityId, artifactPath, findings);
+                    }
+                }
+            }
         }
 
         private static void ValidateLayoutGeometry(MissionLayout layout, List<MissionSceneMaterializationFinding> findings, string artifactPath)
