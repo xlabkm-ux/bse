@@ -57,16 +57,16 @@ namespace BreachScenarioEngine.Mcp.Editor
             var portals = BuildPortals(roomModels, options.LayoutRevisionId, Math.Max(1, options.CorridorWidth), options.ForceAdjacency);
             var windows = BuildWindows(roomModels, options.LayoutRevisionId, boundsWidth, boundsHeight);
             var breachPoints = BuildBreachPoints(roomModels, options.LayoutRevisionId);
-            var coverGraph = TacticalGraphBuilder.BuildCoverGraph(
+            var coverGraph = MissionPipelineEditorService.BuildCoverGraph(
                 options.LayoutRevisionId,
                 roomModels.Select(room => room.ToJson()).ToList(),
                 portals.Select(portal => (JsonObject)portal.ToJson().DeepClone()).ToList(),
                 breachPoints.Select(breachPoint => (JsonObject)breachPoint.DeepClone()).ToList(),
                 Math.Max(roomModels.Count, options.CoverBudget));
-            var visibilityGraph = TacticalGraphBuilder.BuildVisibilityGraph(
+            var visibilityGraph = MissionPipelineEditorService.BuildVisibilityGraph(
                 options.LayoutRevisionId,
                 portals.Select(portal => (JsonObject)portal.ToJson().DeepClone()).ToList());
-            var hearingGraph = TacticalGraphBuilder.BuildHearingGraph(
+            var hearingGraph = MissionPipelineEditorService.BuildHearingGraph(
                 options.LayoutRevisionId,
                 portals.Select(portal => (JsonObject)portal.ToJson().DeepClone()).ToList(),
                 options.WallMultiplier,

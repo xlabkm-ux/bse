@@ -2,7 +2,8 @@
   "name": "BreachScenarioEngine.Mcp.Editor.Tests",
   "rootNamespace": "BreachScenarioEngine.Mcp.Editor.Tests",
   "references": [
-    "BreachScenarioEngine.Mcp.Editor"
+    "BreachScenarioEngine.Mcp.Editor",
+    "BreachScenarioEngine.Generation.TacticalGraphs"
   ],
   "includePlatforms": [
     "Editor"

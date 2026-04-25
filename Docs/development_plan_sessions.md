@@ -932,3 +932,205 @@ Before switching chats:
 - [Docs/mission_data_contract_v2.3.md](mission_data_contract_v2.3.md)
 - [Docs/generation_manifest_contract_v2.3.md](generation_manifest_contract_v2.3.md)
 - [Docs/runtime_tools.md](runtime_tools.md)
+
+## Proposed Next Track: Post-Transfer Hardening
+
+This track is the next execution plan after the BREACH technology transfer
+finishes or when the user explicitly asks to switch focus. It keeps the
+v2.3 invariants intact while making the generated missions more playable,
+more honest in preview, and easier to validate.
+
+### Session 1: Materializer Passability
+
+Status:
+
+- planned
+
+Goal:
+
+- make generated scenes traversable by clearing collision for doors and breach
+  points while keeping windows on an explicit policy
+
+Work:
+
+- inspect `Assets/Scripts/Runtime/MissionSceneMaterializer.cs`
+- clear `World_Collision` tiles for door portals and breach points using
+  deterministic tile rounding rules
+- keep normal windows visual-only unless the contract explicitly marks them as
+  breachable
+- add clear findings for invalid portal position or orientation data
+
+Exit criteria:
+
+- doors and breach points open the matching collision tiles
+- window behavior is documented and stable
+- materialization still returns JSON-compatible PASS/FAIL
+
+Recommended handoff note:
+
+- "Please fix collision clearing in the materializer first. Preview scenes
+  need to be traversable before we harden the rest of the pipeline."
+
+### Session 2: Materializer Consistency Guards
+
+Status:
+
+- planned
+
+Goal:
+
+- stop stale layout and entity artifacts from producing mixed preview scenes
+
+Work:
+
+- compare `layoutRevisionId` across layout, entities, and manifest artifacts
+- compare mission ids across config, layout, entities, and manifest where
+  applicable
+- fail fast with machine-readable findings when artifacts do not match
+- add EditMode tests for stale layout and mission-id mismatches
+
+Exit criteria:
+
+- stale or mismatched artifacts cannot materialize a preview scene
+- failures are returned as structured JSON findings
+
+Recommended handoff note:
+
+- "The next slice should guard the materializer against stale artifact mixes.
+  Please keep the failure path fully machine-readable."
+
+### Session 3: Materializer Tests
+
+Status:
+
+- planned
+
+Goal:
+
+- cover the materializer with focused EditMode tests before broader refactors
+
+Work:
+
+- add tests for context hierarchy creation
+- add tests for door collision clearing
+- add tests for breach-point collision clearing
+- add tests for failed manifest handling
+- add tests for missing catalog handling
+
+Exit criteria:
+
+- the materializer behavior is protected by targeted tests
+- collision and validation regressions are caught in EditMode
+
+Recommended handoff note:
+
+- "Please add targeted EditMode coverage for the materializer. The goal is to
+  lock down passability, failure handling, and catalog validation."
+
+### Session 4: Runtime BSP Boundary
+
+Status:
+
+- planned
+
+Goal:
+
+- move the pure BSP layout generator out of the editor package and into
+  repo-owned runtime generation code
+
+Work:
+
+- create or move `BspLayoutGenerator` into
+  `Assets/Scripts/Generation/Layout/`
+- add a runtime asmdef for layout generation if needed
+- keep the editor package as a thin consumer or facade
+- preserve deterministic layout output and `layoutRevisionId` behavior unless
+  a deliberate bump is required
+
+Exit criteria:
+
+- the layout algorithm no longer lives only inside the editor package
+- the editor package consumes the runtime generator boundary cleanly
+
+Recommended handoff note:
+
+- "Please move the pure layout generator across the runtime boundary. Keep the
+  existing deterministic layout contract intact."
+
+### Session 5: Catalog-Driven Visuals
+
+Status:
+
+- planned
+
+Goal:
+
+- make preview content lookup honest while keeping debug fallback available
+
+Work:
+
+- add a simple content resolver seam for tiles and prefabs
+- validate catalog presence, but keep preview fallback explicit
+- document that preview visuals are output-only and not the source of truth
+- avoid introducing `Resources.Load` as the normal content path
+
+Exit criteria:
+
+- preview uses a clear content-resolution seam
+- debug fallback is explicit and documented
+- catalog handling is honest without overbuilding the content layer
+
+Recommended handoff note:
+
+- "Please add a content resolution seam so the preview layer can move toward
+  real assets without hiding debug fallback behavior."
+
+### Session 6: CI Honesty And Validation
+
+Status:
+
+- planned
+
+Goal:
+
+- make the GitHub Actions pilot workflow truthful and close the loop with a
+  full validation sweep
+
+Work:
+
+- decide whether the workflow is a placeholder or a real Unity runner
+- update workflow naming and step text accordingly
+- run the local validation sequence for compile, EditMode tests, and pilot
+  mission execution
+- inspect generated reports and note any remaining risks
+
+Exit criteria:
+
+- workflow text matches its actual behavior
+- local validation is run and recorded
+- remaining risks are called out explicitly
+
+Recommended handoff note:
+
+- "Please finish by making the CI story honest and running the full validation
+  sequence. If anything is deferred, record the exact blocker."
+
+### Suggested Chat Split For This Track
+
+Use separate chats for these clusters:
+
+1. Materializer passability and consistency guards
+2. Materializer tests
+3. Runtime BSP boundary
+4. Catalog-driven visuals
+5. CI honesty and validation
+
+### Handoff Checklist For This Track
+
+Before switching chats:
+
+- note what was completed
+- note the exact file paths touched
+- note the next blocking step
+- note any failing test or compile message verbatim
+- note whether Unity was last validated in batch mode or live mode

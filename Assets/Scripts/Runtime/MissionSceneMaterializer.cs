@@ -109,6 +109,17 @@ namespace BreachScenarioEngine.Runtime
                 return Complete(report, findings, artifacts, "Entities artifact is missing or unreadable.");
             }
 
+            ValidateLayoutGeometry(layout, findings, config.LayoutPath);
+            ValidateCatalogRefs(config, findings, artifacts);
+            if (findings.Count > 0)
+            {
+                report.status = "FAIL";
+                report.message = findings[0].message;
+                report.findings = findings.ToArray();
+                report.artifacts = artifacts.ToArray();
+                return report;
+            }
+
             EnsureStructure(context, config, layout, manifest);
             var clearedGeneratedObjectCount = ClearGeneratedContent(context);
             var rooms = BuildRoomLookup(layout.RoomGraph.rooms);
@@ -120,16 +131,6 @@ namespace BreachScenarioEngine.Runtime
             report.metrics.objectiveCount = entities.objectives != null ? entities.objectives.Length : 0;
             report.metrics.catalogCount = CountCatalogRefs(config);
             report.metrics.clearedGeneratedObjectCount = clearedGeneratedObjectCount;
-
-            ValidateCatalogRefs(config, findings, artifacts);
-            if (findings.Count > 0)
-            {
-                report.status = "FAIL";
-                report.message = findings[0].message;
-                report.findings = findings.ToArray();
-                report.artifacts = artifacts.ToArray();
-                return report;
-            }
 
             MaterializeRooms(layout, context, findings, ref report.metrics.tileCount);
             MaterializePortals(layout, context, rooms, findings, ref report.metrics.doorCount, ref report.metrics.windowCount, ref report.metrics.extractionZoneCount);
@@ -267,7 +268,13 @@ namespace BreachScenarioEngine.Runtime
                     var position = new Vector3(portal.x, portal.y, 0f);
                     var width = Mathf.Max(0.5f, portal.width);
                     var size = IsHorizontal(portal.orientation) ? new Vector3(width, 0.35f, 1f) : new Vector3(0.35f, width, 1f);
-                CreateMarker(parent, layout.missionId, portal.id, position, size, color, portal.kind, portal.id, portal.id, portal.layoutRevisionId, false);
+
+                    if (!IsWindowPortal(portal))
+                    {
+                        ClearCollisionSegment(context.CollisionMap, portal.x, portal.y, portal.width, portal.orientation);
+                    }
+
+                    CreateMarker(parent, layout.missionId, portal.id, position, size, color, portal.kind, portal.id, portal.id, portal.layoutRevisionId, false);
 
                     if (IsWindowPortal(portal))
                     {
@@ -294,6 +301,7 @@ namespace BreachScenarioEngine.Runtime
 
                 var position = new Vector3(breachPoint.x, breachPoint.y, 0f);
                 var size = new Vector3(Mathf.Max(0.5f, breachPoint.width), 0.35f, 1f);
+                ClearCollisionSegment(context.CollisionMap, breachPoint.x, breachPoint.y, breachPoint.width, breachPoint.side);
                 CreateMarker(context.DoorsRoot, layout.missionId, breachPoint.id, position, size, new Color(0.95f, 0.42f, 0.24f, 1f), breachPoint.kind, breachPoint.id, breachPoint.id, breachPoint.layoutRevisionId, false);
                 doorCount++;
             }
@@ -383,6 +391,77 @@ namespace BreachScenarioEngine.Runtime
             ValidateCatalogAsset(config.EnemyCatalog, "enemyCatalog", findings, artifacts);
             ValidateCatalogAsset(config.EnvironmentCatalog, "environmentCatalog", findings, artifacts);
             ValidateCatalogAsset(config.ObjectiveCatalog, "objectiveCatalog", findings, artifacts);
+        }
+
+        private static void ValidateLayoutGeometry(MissionLayout layout, List<MissionSceneMaterializationFinding> findings, string artifactPath)
+        {
+            if (layout == null)
+            {
+                findings.Add(Finding("SCENE_LAYOUT_MISSING", "Layout artifact is missing or unreadable.", artifactPath));
+                return;
+            }
+
+            if (layout.PortalGraph.portals != null)
+            {
+                foreach (var portal in layout.PortalGraph.portals)
+                {
+                    ValidatePortal(portal, findings, artifactPath);
+                }
+            }
+
+            if (layout.LayoutGraph.breachPoints != null)
+            {
+                foreach (var breachPoint in layout.LayoutGraph.breachPoints)
+                {
+                    ValidateBreachPoint(breachPoint, findings, artifactPath);
+                }
+            }
+        }
+
+        private static void ValidatePortal(MissionPortal portal, List<MissionSceneMaterializationFinding> findings, string artifactPath)
+        {
+            if (portal == null)
+            {
+                return;
+            }
+
+            if (!IsFinite(portal.x) || !IsFinite(portal.y))
+            {
+                findings.Add(Finding("SCENE_PORTAL_POSITION_INVALID", "Portal position is invalid.", artifactPath));
+            }
+
+            if (!IsFinite(portal.width) || portal.width <= 0f)
+            {
+                findings.Add(Finding("SCENE_PORTAL_WIDTH_INVALID", "Portal width is invalid.", artifactPath));
+            }
+
+            if (!TryGetPortalAxis(portal.orientation, out _))
+            {
+                findings.Add(Finding("SCENE_PORTAL_ORIENTATION_INVALID", "Portal orientation is invalid.", artifactPath));
+            }
+        }
+
+        private static void ValidateBreachPoint(MissionBreachPoint breachPoint, List<MissionSceneMaterializationFinding> findings, string artifactPath)
+        {
+            if (breachPoint == null)
+            {
+                return;
+            }
+
+            if (!IsFinite(breachPoint.x) || !IsFinite(breachPoint.y))
+            {
+                findings.Add(Finding("SCENE_BREACH_POSITION_INVALID", "Breach point position is invalid.", artifactPath));
+            }
+
+            if (!IsFinite(breachPoint.width) || breachPoint.width <= 0f)
+            {
+                findings.Add(Finding("SCENE_BREACH_WIDTH_INVALID", "Breach point width is invalid.", artifactPath));
+            }
+
+            if (!TryGetBreachAxis(breachPoint.side, out _))
+            {
+                findings.Add(Finding("SCENE_BREACH_SIDE_INVALID", "Breach point side is invalid.", artifactPath));
+            }
         }
 
         private static void ValidateCatalogAsset(MissionCatalogAsset catalog, string role, List<MissionSceneMaterializationFinding> findings, List<string> artifacts)
@@ -509,9 +588,50 @@ namespace BreachScenarioEngine.Runtime
             return string.Equals(orientation, "horizontal", StringComparison.OrdinalIgnoreCase);
         }
 
+        private static bool TryGetPortalAxis(string orientation, out string axis)
+        {
+            if (IsHorizontal(orientation))
+            {
+                axis = "horizontal";
+                return true;
+            }
+
+            if (string.Equals(orientation, "vertical", StringComparison.OrdinalIgnoreCase))
+            {
+                axis = "vertical";
+                return true;
+            }
+
+            axis = "";
+            return false;
+        }
+
+        private static bool TryGetBreachAxis(string side, out string axis)
+        {
+            if (string.Equals(side, "north", StringComparison.OrdinalIgnoreCase) || string.Equals(side, "south", StringComparison.OrdinalIgnoreCase))
+            {
+                axis = "horizontal";
+                return true;
+            }
+
+            if (string.Equals(side, "east", StringComparison.OrdinalIgnoreCase) || string.Equals(side, "west", StringComparison.OrdinalIgnoreCase))
+            {
+                axis = "vertical";
+                return true;
+            }
+
+            axis = "";
+            return false;
+        }
+
         private static bool IsWindowPortal(MissionPortal portal)
         {
             return portal != null && portal.kind != null && portal.kind.IndexOf("window", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
 
         private static int StableHash(string value)
@@ -578,6 +698,41 @@ namespace BreachScenarioEngine.Runtime
             }
 
             tilemap.SetTile(new Vector3Int(x, y, 0), tile);
+        }
+
+        private static void ClearCollisionSegment(Tilemap tilemap, float x, float y, float span, string axis)
+        {
+            if (tilemap == null)
+            {
+                return;
+            }
+
+            if (!IsFinite(x) || !IsFinite(y) || !IsFinite(span) || span <= 0f)
+            {
+                return;
+            }
+
+            var centerX = Mathf.RoundToInt(x);
+            var centerY = Mathf.RoundToInt(y);
+            var tileSpan = Mathf.Max(1, Mathf.RoundToInt(span));
+            var halfSpan = Mathf.FloorToInt(tileSpan / 2f);
+
+            if (string.Equals(axis, "vertical", StringComparison.OrdinalIgnoreCase))
+            {
+                var startY = centerY - halfSpan;
+                for (var offset = 0; offset < tileSpan; offset++)
+                {
+                    SetTile(tilemap, centerX, startY + offset, null);
+                }
+
+                return;
+            }
+
+            var startX = centerX - halfSpan;
+            for (var offset = 0; offset < tileSpan; offset++)
+            {
+                SetTile(tilemap, startX + offset, centerY, null);
+            }
         }
 
         private static void ClearTilemap(Tilemap tilemap)
@@ -700,7 +855,9 @@ namespace BreachScenarioEngine.Runtime
                     collider = existing.gameObject.AddComponent<TilemapCollider2D>();
                 }
 
-                collider.usedByComposite = useComposite;
+                collider.compositeOperation = useComposite
+                    ? Collider2D.CompositeOperation.Merge
+                    : Collider2D.CompositeOperation.None;
 
                 var composite = existing.GetComponent<CompositeCollider2D>();
                 if (useComposite && composite == null)
