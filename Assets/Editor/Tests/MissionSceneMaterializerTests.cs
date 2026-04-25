@@ -10,6 +10,58 @@ namespace BreachScenarioEngine.Editor.Tests
     public sealed class MissionSceneMaterializerTests
     {
         [Test]
+        public void MaterializeCreatesCanonicalContextHierarchy()
+        {
+            var bundle = CreatePreviewBundle();
+            try
+            {
+                var report = MissionSceneMaterializer.Materialize(bundle.Context, bundle.Config, bundle.Manifest, bundle.Layout, bundle.Entities);
+
+                Assert.AreEqual("PASS", report.status, report.message);
+                Assert.NotNull(bundle.Context.Grid, "Grid");
+                Assert.NotNull(bundle.Context.BaseMap, "BaseMap");
+                Assert.NotNull(bundle.Context.CollisionMap, "CollisionMap");
+                Assert.NotNull(bundle.Context.DecorMap, "DecorMap");
+                Assert.NotNull(bundle.Context.InteractablesMap, "InteractablesMap");
+                Assert.NotNull(bundle.Context.DoorsRoot, "DoorsRoot");
+                Assert.NotNull(bundle.Context.WindowsRoot, "WindowsRoot");
+                Assert.NotNull(bundle.Context.CoversRoot, "CoversRoot");
+                Assert.NotNull(bundle.Context.EnemiesRoot, "EnemiesRoot");
+                Assert.NotNull(bundle.Context.OperativesRoot, "OperativesRoot");
+                Assert.NotNull(bundle.Context.ObjectivesRoot, "ObjectivesRoot");
+                Assert.NotNull(bundle.Context.HostagesRoot, "HostagesRoot");
+                Assert.NotNull(bundle.Context.ExtractionRoot, "ExtractionRoot");
+                Assert.NotNull(bundle.Context.DebugRoot, "DebugRoot");
+
+                Assert.AreSame(bundle.Root.transform, bundle.Context.Grid.transform.parent);
+                Assert.AreSame(bundle.Context.Grid.transform, bundle.Context.BaseMap.transform.parent);
+                Assert.AreSame(bundle.Context.Grid.transform, bundle.Context.CollisionMap.transform.parent);
+                Assert.AreSame(bundle.Context.Grid.transform, bundle.Context.DecorMap.transform.parent);
+                Assert.AreSame(bundle.Context.Grid.transform, bundle.Context.InteractablesMap.transform.parent);
+
+                var generated = bundle.Root.transform.Find("Generated");
+                Assert.NotNull(generated, "Generated");
+                Assert.AreSame(generated, bundle.Context.DoorsRoot.parent);
+                Assert.AreSame(generated, bundle.Context.WindowsRoot.parent);
+                Assert.AreSame(generated, bundle.Context.CoversRoot.parent);
+                Assert.AreSame(generated, bundle.Context.EnemiesRoot.parent);
+                Assert.AreSame(generated, bundle.Context.OperativesRoot.parent);
+                Assert.AreSame(generated, bundle.Context.ObjectivesRoot.parent);
+                Assert.AreSame(generated, bundle.Context.HostagesRoot.parent);
+                Assert.AreSame(generated, bundle.Context.ExtractionRoot.parent);
+                Assert.AreSame(generated, bundle.Context.DebugRoot.parent);
+                Assert.NotNull(bundle.Context.CollisionMap.GetComponent<TilemapCollider2D>(), "Collision TilemapCollider2D");
+                Assert.NotNull(bundle.Context.CollisionMap.GetComponent<CompositeCollider2D>(), "Collision CompositeCollider2D");
+                Assert.NotNull(bundle.Context.CollisionMap.GetComponent<Rigidbody2D>(), "Collision Rigidbody2D");
+                Assert.Greater(bundle.Root.GetComponentsInChildren<GeneratedOwnershipMarker>().Length, 0);
+            }
+            finally
+            {
+                DestroyBundle(bundle);
+            }
+        }
+
+        [Test]
         public void MaterializeClearsDoorAndBreachCollisionButLeavesWindowsVisualOnly()
         {
             var bundle = CreatePreviewBundle();
@@ -96,6 +148,48 @@ namespace BreachScenarioEngine.Editor.Tests
                 Assert.AreEqual("FAIL", report.status);
                 Assert.AreEqual("SCENE_PORTAL_ORIENTATION_INVALID", report.findings[0].code);
                 Assert.AreEqual("Portal orientation is invalid.", report.findings[0].message);
+            }
+            finally
+            {
+                DestroyBundle(bundle);
+            }
+        }
+
+        [Test]
+        public void MaterializeFailsOnNonPassManifest()
+        {
+            var bundle = CreatePreviewBundle();
+            bundle.Manifest.status = "FAIL";
+
+            try
+            {
+                var report = MissionSceneMaterializer.Materialize(bundle.Context, bundle.Config, bundle.Manifest, bundle.Layout, bundle.Entities);
+
+                Assert.AreEqual("FAIL", report.status);
+                Assert.AreEqual("SCENE_MANIFEST_NOT_PASS", report.findings[0].code);
+                Assert.AreEqual("Scene preview requires a PASS manifest.", report.findings[0].message);
+                Assert.IsNull(bundle.Root.transform.Find("Generated"));
+            }
+            finally
+            {
+                DestroyBundle(bundle);
+            }
+        }
+
+        [Test]
+        public void MaterializeFailsOnMissingCatalog()
+        {
+            var bundle = CreatePreviewBundle();
+            SetPrivateField(bundle.Config, "environmentCatalog", null);
+
+            try
+            {
+                var report = MissionSceneMaterializer.Materialize(bundle.Context, bundle.Config, bundle.Manifest, bundle.Layout, bundle.Entities);
+
+                Assert.AreEqual("FAIL", report.status);
+                Assert.AreEqual("SCENE_CATALOG_MISSING", report.findings[0].code);
+                Assert.AreEqual("Mission catalog is missing: environmentCatalog", report.findings[0].message);
+                Assert.IsNull(bundle.Root.transform.Find("Generated"));
             }
             finally
             {
