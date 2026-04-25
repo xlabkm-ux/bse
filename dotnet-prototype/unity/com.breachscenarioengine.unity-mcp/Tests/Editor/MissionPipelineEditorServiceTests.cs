@@ -35,7 +35,7 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             var templatePath = Path.Combine(_testRoot, "invalid.template.yaml");
             File.WriteAllText(templatePath, string.Join("\n", new[]
             {
-                "schemaVersion: \"tb.mission_template.v2.2\"",
+                "schemaVersion: \"tb.mission_template.v2.3\"",
                 "missionId: \"VS99_Invalid\"",
                 "missionTitle: \"Invalid\"",
                 "",
@@ -90,13 +90,38 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
         }
 
         [Test]
+        public void ValidateTemplate_WithUnknownAuthoringFields_FailsSchemaValidation()
+        {
+            var templatePath = Path.Combine(_testRoot, "unknown-fields.template.yaml");
+            File.WriteAllText(templatePath, ValidTemplate("VS84_UnknownFields") + string.Join("\n", new[]
+            {
+                "unexpectedTopLevel: true",
+                "generationMeta:",
+                "  unsupportedSeedMode: \"random\"",
+                ""
+            }));
+
+            var (success, message) = MissionPipelineEditorService.Execute("validate_template", RawArgs(templatePath));
+
+            Assert.False(success);
+            using var doc = JsonDocument.Parse(message);
+            var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
+            Assert.IsTrue(findings.Any(f =>
+                f.GetProperty("code").GetString() == "TPL_SCHEMA_INVALID" &&
+                f.GetProperty("message").GetString().Contains("Unknown top-level field")));
+            Assert.IsTrue(findings.Any(f =>
+                f.GetProperty("code").GetString() == "TPL_SCHEMA_INVALID" &&
+                f.GetProperty("message").GetString().Contains("Unknown generationMeta field")));
+        }
+
+        [Test]
         public void CompilePayload_ValidTemplate_WritesSchemaAlignedPayload()
         {
             var templatePath = Path.Combine(_testRoot, "valid.template.yaml");
             var payloadPath = Path.Combine(_testRoot, "mission_payload.generated.json");
             File.WriteAllText(templatePath, string.Join("\n", new[]
             {
-                "schemaVersion: \"tb.mission_template.v2.2\"",
+                "schemaVersion: \"tb.mission_template.v2.3\"",
                 "missionId: \"VS98_TestMission\"",
                 "missionTitle: \"Test Mission #1\"",
                 "",
@@ -146,8 +171,8 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.True(File.Exists(payloadPath));
             using var doc = JsonDocument.Parse(File.ReadAllText(payloadPath));
             var root = doc.RootElement;
-            Assert.AreEqual("bse.mission_payload.v2.2", root.GetProperty("header").GetProperty("schemaVersion").GetString());
-            Assert.AreEqual("2.2", root.GetProperty("header").GetProperty("pipelineVersion").GetString());
+            Assert.AreEqual("bse.mission_payload.v2.3", root.GetProperty("header").GetProperty("schemaVersion").GetString());
+            Assert.AreEqual("2.3", root.GetProperty("header").GetProperty("pipelineVersion").GetString());
             Assert.AreEqual("VS98_TestMission", root.GetProperty("header").GetProperty("missionId").GetString());
             Assert.AreEqual(42, root.GetProperty("header").GetProperty("initialSeed").GetInt32());
             Assert.AreEqual(0, root.GetProperty("header").GetProperty("effectiveSeed").GetInt32());
@@ -227,7 +252,7 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             using var entitiesDoc = JsonDocument.Parse(File.ReadAllText(entitiesPath));
             var layoutRevisionId = layoutDoc.RootElement.GetProperty("layoutRevisionId").GetString();
             var root = entitiesDoc.RootElement;
-            Assert.AreEqual("bse.mission_entities.v2.2", root.GetProperty("schemaVersion").GetString());
+            Assert.AreEqual("bse.mission_entities.v2.3", root.GetProperty("schemaVersion").GetString());
             Assert.AreEqual(layoutRevisionId, root.GetProperty("layoutRevisionId").GetString());
             Assert.AreEqual(2, root.GetProperty("actors").GetArrayLength());
             Assert.AreEqual(1, root.GetProperty("objectives").GetArrayLength());
@@ -238,7 +263,7 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
                 Assert.False(string.IsNullOrWhiteSpace(entity.GetProperty("navNodeId").GetString()));
                 Assert.AreEqual(layoutRevisionId, entity.GetProperty("layoutRevisionId").GetString());
                 var ownership = entity.GetProperty("ownership");
-                Assert.AreEqual("bse-pipeline", ownership.GetProperty("owner").GetString());
+                Assert.AreEqual("manage_mission", ownership.GetProperty("owner").GetString());
                 Assert.AreEqual("manage_mission.place_entities", ownership.GetProperty("generatedBy").GetString());
                 Assert.AreEqual(layoutRevisionId, ownership.GetProperty("layoutRevisionId").GetString());
                 Assert.False(string.IsNullOrWhiteSpace(ownership.GetProperty("stableKey").GetString()));
@@ -299,7 +324,7 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.AreEqual("PASS", resultDoc.RootElement.GetProperty("status").GetString());
             using var summaryDoc = JsonDocument.Parse(File.ReadAllText(summaryPath));
             var summary = summaryDoc.RootElement;
-            Assert.AreEqual("bse.verification_summary.v2.2", summary.GetProperty("schemaVersion").GetString());
+            Assert.AreEqual("bse.verification_summary.v2.3", summary.GetProperty("schemaVersion").GetString());
             Assert.AreEqual("PASS", summary.GetProperty("status").GetString());
             Assert.AreEqual(2, summary.GetProperty("metrics").GetProperty("actorCount").GetInt32());
             Assert.AreEqual(1, summary.GetProperty("metrics").GetProperty("objectiveCount").GetInt32());
@@ -393,11 +418,11 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.True(File.Exists(manifestPath));
             using var manifestDoc = JsonDocument.Parse(File.ReadAllText(manifestPath));
             var manifest = manifestDoc.RootElement;
-            Assert.AreEqual("bse.generation_manifest.v2.2", manifest.GetProperty("schemaVersion").GetString());
+            Assert.AreEqual("bse.generation_manifest.v2.3", manifest.GetProperty("schemaVersion").GetString());
             Assert.AreEqual("PASS", manifest.GetProperty("status").GetString());
             Assert.AreEqual(42, manifest.GetProperty("requestedSeed").GetInt32());
             Assert.AreEqual(42, manifest.GetProperty("effectiveSeed").GetInt32());
-            Assert.AreEqual("bse-pipeline", manifest.GetProperty("lockOwner").GetString());
+            Assert.AreEqual("manage_mission", manifest.GetProperty("lockOwner").GetString());
             Assert.AreEqual("PASS", manifest.GetProperty("verification").GetProperty("status").GetString());
             Assert.AreEqual(ToRepoPath(payloadPath), manifest.GetProperty("artifacts").GetProperty("payload").GetString());
             Assert.AreEqual(ToRepoPath(summaryPath), manifest.GetProperty("artifacts").GetProperty("verificationSummary").GetString());
@@ -409,7 +434,7 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
         }
 
         [Test]
-        public void WriteManifest_WhenVerificationFailed_DoesNotWriteManifest()
+        public void WriteManifest_WhenVerificationBlocked_DoesNotWriteManifestAndUpdatesState()
         {
             var templatePath = Path.Combine(_testRoot, "manifest-fail.template.yaml");
             var summaryPath = Path.Combine(_testRoot, "verification_summary.json");
@@ -417,8 +442,8 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             File.WriteAllText(templatePath, ValidTemplate("VS89_ManifestFail"));
             File.WriteAllText(summaryPath, new JsonObject
             {
-                ["schemaVersion"] = "bse.verification_summary.v2.2",
-                ["pipelineVersion"] = "2.2",
+                ["schemaVersion"] = "bse.verification_summary.v2.3",
+                ["pipelineVersion"] = "2.3",
                 ["missionId"] = "VS89_ManifestFail",
                 ["status"] = "FAIL",
                 ["layoutRevisionId"] = "layout_failed",
@@ -433,6 +458,46 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             using var doc = JsonDocument.Parse(message);
             var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
             Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "MISSION_VERIFICATION_FAILED"));
+            using var stateDoc = JsonDocument.Parse(File.ReadAllText(Path.Combine(_testRoot, "mission_state.json")));
+            Assert.AreEqual("BLOCKED", stateDoc.RootElement.GetProperty("status").GetString());
+            Assert.AreEqual("MISSION_VERIFICATION_FAILED", stateDoc.RootElement.GetProperty("lastFindingCode").GetString());
+        }
+
+        [Test]
+        public void WriteManifest_WhenRetryBudgetExhausted_DoesNotWriteManifestAndUpdatesState()
+        {
+            var templatePath = Path.Combine(_testRoot, "manifest-retry-exhausted.template.yaml");
+            var summaryPath = Path.Combine(_testRoot, "verification_summary.json");
+            var manifestPath = Path.Combine(_testRoot, "generation_manifest.json");
+            File.WriteAllText(templatePath, ValidTemplate("VS83_RetryExhausted").Replace("  maxRetries: 5", "  maxRetries: 0"));
+            File.WriteAllText(summaryPath, new JsonObject
+            {
+                ["schemaVersion"] = "bse.verification_summary.v2.3",
+                ["pipelineVersion"] = "2.3",
+                ["missionId"] = "VS83_RetryExhausted",
+                ["status"] = "FAIL",
+                ["layoutRevisionId"] = "layout_failed",
+                ["findings"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["severity"] = "error",
+                        ["code"] = "NAV_OBJECTIVE_UNREACHABLE",
+                        ["message"] = "Objective is unreachable"
+                    }
+                },
+                ["metrics"] = new JsonObject()
+            }.ToJsonString());
+
+            var (success, message) = MissionPipelineEditorService.Execute("write_manifest", RawArgs(templatePath, verificationPath: summaryPath, manifestPath: manifestPath));
+
+            Assert.False(success);
+            Assert.False(File.Exists(manifestPath));
+            using var doc = JsonDocument.Parse(message);
+            var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
+            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "RETRY_BUDGET_EXHAUSTED"));
+            using var stateDoc = JsonDocument.Parse(File.ReadAllText(Path.Combine(_testRoot, "mission_state.json")));
+            Assert.AreEqual("FAILED", stateDoc.RootElement.GetProperty("status").GetString());
         }
 
         [Test]
@@ -491,15 +556,50 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.True(MissionPipelineEditorService.Execute("generate_layout", RawArgs(templatePath, payloadPath, layoutPath)).Success);
             Assert.True(MissionPipelineEditorService.Execute("place_entities", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath)).Success);
             Assert.True(MissionPipelineEditorService.Execute("verify", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath, summaryPath)).Success);
-            File.WriteAllText(manifestPath + ".lock", "held");
+            var lockPath = Path.Combine(_testRoot, ".generation.lock");
+            File.WriteAllText(lockPath, new JsonObject
+            {
+                ["missionId"] = "VS88_ManifestLock",
+                ["jobId"] = "held",
+                ["lockOwner"] = "manage_mission",
+                ["startedAtUtc"] = DateTime.UtcNow.ToString("O"),
+                ["updatedAtUtc"] = DateTime.UtcNow.ToString("O"),
+                ["currentStep"] = "write_manifest",
+                ["processId"] = 1
+            }.ToJsonString());
 
             var (success, message) = MissionPipelineEditorService.Execute("write_manifest", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath, summaryPath, manifestPath));
 
             Assert.False(success);
-            Assert.True(File.Exists(manifestPath + ".lock"));
+            Assert.True(File.Exists(lockPath));
             using var doc = JsonDocument.Parse(message);
             var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
             Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "GENERATION_LOCK_CONFLICT"));
+        }
+
+        [Test]
+        public void CleanupGenerationLock_WhenLockIsStale_RemovesMissionLock()
+        {
+            var templatePath = Path.Combine(_testRoot, "cleanup-lock.template.yaml");
+            File.WriteAllText(templatePath, ValidTemplate("VS82_CleanupLock"));
+            var lockPath = Path.Combine(_testRoot, ".generation.lock");
+            File.WriteAllText(lockPath, new JsonObject
+            {
+                ["missionId"] = "VS82_CleanupLock",
+                ["jobId"] = "stale",
+                ["lockOwner"] = "manage_mission",
+                ["startedAtUtc"] = DateTime.UtcNow.AddHours(-2).ToString("O"),
+                ["updatedAtUtc"] = DateTime.UtcNow.AddHours(-2).ToString("O"),
+                ["currentStep"] = "verify",
+                ["processId"] = 1
+            }.ToJsonString());
+
+            var (success, message) = MissionPipelineEditorService.Execute("cleanup_generation_lock", RawArgs(templatePath));
+
+            Assert.True(success, message);
+            Assert.False(File.Exists(lockPath));
+            using var stateDoc = JsonDocument.Parse(File.ReadAllText(Path.Combine(_testRoot, "mission_state.json")));
+            Assert.AreEqual("IDLE", stateDoc.RootElement.GetProperty("status").GetString());
         }
 
         [Test]
@@ -588,6 +688,7 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
                     "mission_compile_report.json",
                     "mission_layout.generated.json",
                     "mission_entities.generated.json",
+                    "mission_state.json",
                     "verification_summary.json",
                     "generation_manifest.json"
                 };
@@ -681,7 +782,7 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
         {
             return string.Join("\n", new[]
             {
-                "schemaVersion: \"tb.mission_template.v2.2\"",
+                "schemaVersion: \"tb.mission_template.v2.3\"",
                 $"missionId: \"{missionId}\"",
                 "missionTitle: \"Layout Mission\"",
                 "",
@@ -737,3 +838,5 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
         }
     }
 }
+
+

@@ -17,9 +17,10 @@ namespace BreachScenarioEngine.Mcp.Editor
 {
     public static class MissionPipelineEditorService
     {
-        private const string PipelineVersion = "2.2";
-        private const string TemplateSchemaVersion = "tb.mission_template.v2.2";
-        private const string PayloadSchemaVersion = "bse.mission_payload.v2.2";
+        private const string PipelineVersion = "2.3";
+        private const string TemplateSchemaVersion = "tb.mission_template.v2.3";
+        private const string PayloadSchemaVersion = "bse.mission_payload.v2.3";
+        private const string LockOwner = "manage_mission";
         private static readonly HashSet<string> TacticalThemes = new(StringComparer.Ordinal) { "urban_cqb", "stealth_facility", "residential" };
         private static readonly HashSet<string> NavigationPolicies = new(StringComparer.Ordinal) { "FullAccess", "StaticGuard", "CanOpenDoors", "Immobilized" };
         private static readonly HashSet<string> PlacementPolicies = new(StringComparer.Ordinal) { "EntryPointOnly", "PostLayout_TaggedRoom", "PostLayout_AnyRoom", "SecureRoomOnly" };
@@ -42,6 +43,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                 "place_entities" => PlaceEntities(raw),
                 "verify" => Verify(raw),
                 "write_manifest" => WriteManifest(raw),
+                "cleanup_generation_lock" => CleanupGenerationLock(raw),
                 _ => (false, MissionResultJson("FAIL", "", Array.Empty<string>(), new[]
                 {
                     Finding("error", "MISSION_ACTION_UNSUPPORTED", $"Unsupported manage_mission action: {action}")
@@ -87,6 +89,18 @@ namespace BreachScenarioEngine.Mcp.Editor
             }
 
             var reportPath = Path.Combine(missionDir, "mission_compile_report.json");
+            var statePath = MissionStatePath(missionDir);
+            var artifacts = new[] { ToRepoPath(payloadPath), ToRepoPath(reportPath), ToRepoPath(statePath) };
+
+            if (!GenerationLockSet.TryAcquire(template.MissionId, missionDir, "compile_payload", out var generationLock, out var conflictPath, out var conflictFinding))
+            {
+                findings.Add(conflictFinding!);
+                return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+            }
+
+            using (generationLock!)
+            {
+                WriteMissionState(missionDir, template.MissionId, "VALIDATING", "compile_payload", "", LastFindingCode(findings), generationLock.JobId);
             Directory.CreateDirectory(missionDir);
             Directory.CreateDirectory(Path.GetDirectoryName(payloadPath)!);
 
@@ -95,15 +109,17 @@ namespace BreachScenarioEngine.Mcp.Editor
             findings.AddRange(payloadFindings);
             if (payloadFindings.Any(f => f["severity"]?.GetValue<string>() == "error"))
             {
+                WriteMissionState(missionDir, template.MissionId, "BLOCKED", "compile_payload", "", LastFindingCode(findings), generationLock.JobId);
                 return (false, MissionResultJson("FAIL", template.MissionId, new[] { ToRepoPath(context.TemplatePath!) }, findings));
             }
 
             File.WriteAllText(payloadPath, payloadNode.ToJsonString() + Environment.NewLine);
             File.WriteAllText(reportPath, BuildCompileReportNode(template.MissionId, ToRepoPath(context.TemplatePath!), ToRepoPath(payloadPath), findings).ToJsonString() + Environment.NewLine);
+            WriteMissionState(missionDir, template.MissionId, "COMPILED", "compile_payload", "", LastFindingCode(findings), generationLock.JobId);
             AssetDatabase.Refresh();
 
-            var artifacts = new[] { ToRepoPath(payloadPath), ToRepoPath(reportPath) };
             return (true, MissionResultJson("PASS", template.MissionId, artifacts, findings));
+            }
         }
 
         private static (bool Success, string Message) GenerateLayout(string raw)
@@ -121,6 +137,7 @@ namespace BreachScenarioEngine.Mcp.Editor
 
             var missionDir = Path.GetDirectoryName(context.TemplatePath!)!;
             var layoutPath = ResolveMissionArtifactPath(raw, "layoutPath", missionDir, "mission_layout.generated.json");
+            var statePath = MissionStatePath(missionDir);
             if (!IsUnderProjectRoot(layoutPath))
             {
                 return (false, MissionResultJson("FAIL", template!.MissionId, new[] { ToRepoPath(context.TemplatePath!) }, new[]
@@ -129,6 +146,16 @@ namespace BreachScenarioEngine.Mcp.Editor
                 }));
             }
 
+            var artifacts = new List<string> { ToRepoPath(layoutPath), ToRepoPath(statePath) };
+            if (!GenerationLockSet.TryAcquire(template.MissionId, missionDir, "generate_layout", out var generationLock, out var conflictPath, out var conflictFinding))
+            {
+                findings.Add(conflictFinding!);
+                return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+            }
+
+            using (generationLock!)
+            {
+            WriteMissionState(missionDir, template.MissionId, "VALIDATING", "generate_layout", "", LastFindingCode(findings), generationLock.JobId);
             Directory.CreateDirectory(missionDir);
             Directory.CreateDirectory(Path.GetDirectoryName(layoutPath)!);
 
@@ -140,15 +167,16 @@ namespace BreachScenarioEngine.Mcp.Editor
             }
 
             File.WriteAllText(layoutPath, layoutNode.ToJsonString() + Environment.NewLine);
+            WriteMissionState(missionDir, template.MissionId, "LAYOUT_GENERATED", "generate_layout", layoutNode["layoutRevisionId"]!.GetValue<string>(), LastFindingCode(findings), generationLock.JobId);
             AssetDatabase.Refresh();
 
-            var artifacts = new List<string> { ToRepoPath(layoutPath) };
             if (File.Exists(payloadPath) && IsUnderProjectRoot(payloadPath))
             {
                 artifacts.Add(ToRepoPath(payloadPath));
             }
 
             return (true, MissionResultJson("PASS", template.MissionId, artifacts, findings));
+            }
         }
 
         private static (bool Success, string Message) PlaceEntities(string raw)
@@ -166,6 +194,7 @@ namespace BreachScenarioEngine.Mcp.Editor
 
             var missionDir = Path.GetDirectoryName(context.TemplatePath!)!;
             var layoutPath = ResolveMissionArtifactPath(raw, "layoutPath", missionDir, "mission_layout.generated.json");
+            var statePath = MissionStatePath(missionDir);
             if (!IsUnderProjectRoot(layoutPath))
             {
                 return (false, MissionResultJson("FAIL", template!.MissionId, new[] { ToRepoPath(context.TemplatePath!) }, new[]
@@ -221,12 +250,24 @@ namespace BreachScenarioEngine.Mcp.Editor
                 }));
             }
 
+            var artifacts = new[] { ToRepoPath(layoutPath), ToRepoPath(entitiesPath), ToRepoPath(statePath) };
+            if (!GenerationLockSet.TryAcquire(template.MissionId, missionDir, "place_entities", out var generationLock, out var conflictPath, out var conflictFinding))
+            {
+                findings.Add(conflictFinding!);
+                return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+            }
+
+            using (generationLock!)
+            {
+            WriteMissionState(missionDir, template.MissionId, "LAYOUT_GENERATED", "place_entities", layoutRevisionId, LastFindingCode(findings), generationLock.JobId);
             var placementNode = BuildEntityPlacementNode(template, layoutNode);
             Directory.CreateDirectory(Path.GetDirectoryName(entitiesPath)!);
             File.WriteAllText(entitiesPath, placementNode.ToJsonString() + Environment.NewLine);
+            WriteMissionState(missionDir, template.MissionId, "ENTITIES_PLACED", "place_entities", layoutRevisionId, LastFindingCode(findings), generationLock.JobId);
             AssetDatabase.Refresh();
 
-            return (true, MissionResultJson("PASS", template.MissionId, new[] { ToRepoPath(layoutPath), ToRepoPath(entitiesPath) }, findings));
+            return (true, MissionResultJson("PASS", template.MissionId, artifacts, findings));
+            }
         }
 
         private static (bool Success, string Message) Verify(string raw)
@@ -247,6 +288,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             var layoutPath = ResolveMissionArtifactPath(raw, "layoutPath", missionDir, "mission_layout.generated.json");
             var entitiesPath = ResolveMissionArtifactPath(raw, "entitiesPath", missionDir, "mission_entities.generated.json");
             var summaryPath = ResolveMissionArtifactPath(raw, "verificationPath", missionDir, "verification_summary.json");
+            var statePath = MissionStatePath(missionDir);
             if (!IsUnderProjectRoot(payloadPath) || !IsUnderProjectRoot(layoutPath) || !IsUnderProjectRoot(entitiesPath) || !IsUnderProjectRoot(summaryPath))
             {
                 return (false, MissionResultJson("FAIL", template!.MissionId, new[] { ToRepoPath(context.TemplatePath!) }, new[]
@@ -255,7 +297,16 @@ namespace BreachScenarioEngine.Mcp.Editor
                 }));
             }
 
-            var artifacts = new List<string> { ToRepoPath(payloadPath), ToRepoPath(layoutPath), ToRepoPath(entitiesPath), ToRepoPath(summaryPath) };
+            var artifacts = new List<string> { ToRepoPath(payloadPath), ToRepoPath(layoutPath), ToRepoPath(entitiesPath), ToRepoPath(summaryPath), ToRepoPath(statePath) };
+            if (!GenerationLockSet.TryAcquire(template.MissionId, missionDir, "verify", out var generationLock, out var conflictPath, out var conflictFinding))
+            {
+                findings.Add(conflictFinding!);
+                return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+            }
+
+            using (generationLock!)
+            {
+            WriteMissionState(missionDir, template.MissionId, "VERIFYING", "verify", "", LastFindingCode(findings), generationLock.JobId);
             var layoutNode = ReadJsonObject(layoutPath);
             var entitiesNode = ReadJsonObject(entitiesPath);
             var payloadNode = ReadJsonObject(payloadPath);
@@ -303,9 +354,11 @@ namespace BreachScenarioEngine.Mcp.Editor
             var summary = BuildVerificationSummaryNode(template.MissionId, status, layoutNode?["layoutRevisionId"]?.GetValue<string>() ?? expectedRevisionId, artifacts, findings, metrics);
             Directory.CreateDirectory(Path.GetDirectoryName(summaryPath)!);
             File.WriteAllText(summaryPath, summary.ToJsonString() + Environment.NewLine);
+            WriteMissionState(missionDir, template.MissionId, status == "PASS" ? "PASS" : "FAILED", "verify", summary["layoutRevisionId"]?.GetValue<string>() ?? expectedRevisionId, LastFindingCode(findings), generationLock.JobId);
             AssetDatabase.Refresh();
 
             return (status == "PASS", MissionResultJson(status, template.MissionId, artifacts, findings));
+            }
         }
 
         private static (bool Success, string Message) WriteManifest(string raw)
@@ -327,8 +380,9 @@ namespace BreachScenarioEngine.Mcp.Editor
             var entitiesPath = ResolveMissionArtifactPath(raw, "entitiesPath", missionDir, "mission_entities.generated.json");
             var summaryPath = ResolveMissionArtifactPath(raw, "verificationPath", missionDir, "verification_summary.json");
             var manifestPath = ResolveMissionArtifactPath(raw, "manifestPath", missionDir, "generation_manifest.json");
+            var statePath = MissionStatePath(missionDir);
             if (!IsUnderProjectRoot(payloadPath) || !IsUnderProjectRoot(layoutPath) || !IsUnderProjectRoot(entitiesPath) ||
-                !IsUnderProjectRoot(summaryPath) || !IsUnderProjectRoot(manifestPath))
+                !IsUnderProjectRoot(summaryPath) || !IsUnderProjectRoot(manifestPath) || !IsUnderProjectRoot(statePath))
             {
                 return (false, MissionResultJson("FAIL", template!.MissionId, new[] { ToRepoPath(context.TemplatePath!) }, new[]
                 {
@@ -343,13 +397,23 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ToRepoPath(layoutPath),
                 ToRepoPath(entitiesPath),
                 ToRepoPath(summaryPath),
+                ToRepoPath(statePath),
                 ToRepoPath(manifestPath)
             };
 
+            if (!GenerationLockSet.TryAcquire(template.MissionId, missionDir, "write_manifest", out var generationLock, out var conflictPath, out var conflictFinding))
+            {
+                findings.Add(conflictFinding!);
+                return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
+            }
+
+            using (generationLock!)
+            {
             var summaryNode = ReadJsonObject(summaryPath);
             if (summaryNode == null)
             {
                 findings.Add(Finding("error", "VERIFICATION_SUMMARY_MISSING", "write_manifest requires verification_summary.json from verify", ToRepoPath(summaryPath)));
+                WriteMissionState(missionDir, template.MissionId, "BLOCKED", "write_manifest", "", LastFindingCode(findings), generationLock.JobId);
                 return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
             }
 
@@ -364,15 +428,20 @@ namespace BreachScenarioEngine.Mcp.Editor
             var manifestStatus = "PASS";
             if (!string.Equals(verificationStatus, "PASS", StringComparison.Ordinal))
             {
+                WriteMissionState(missionDir, template.MissionId, "RETRYING", "write_manifest", summaryNode["layoutRevisionId"]?.GetValue<string>() ?? "", FirstErrorCode(summaryNode), generationLock.JobId);
                 var retryResult = TryRunRetryPipeline(template!, payloadPath, layoutPath, entitiesPath, summaryPath, summaryNode, artifacts, retrySeeds, findings);
                 summaryNode = retryResult.SummaryNode;
                 retrySeeds = retryResult.RetrySeeds;
                 verificationStatus = summaryNode["status"]?.GetValue<string>() ?? "";
                 if (!retryResult.Success)
                 {
-                    findings.Add(Finding("error", "MISSION_VERIFICATION_FAILED", "generation_manifest.json records non-PASS verification with effectiveSeed 0", ToRepoPath(summaryPath)));
+                    findings.Add(Finding("error", "MISSION_VERIFICATION_FAILED", "generation_manifest.json is blocked until verification status is PASS", ToRepoPath(summaryPath)));
                     manifestStatus = VerificationFailureIsRetryable(summaryNode) ? "FAILED" : "BLOCKED";
+                    WriteMissionState(missionDir, template.MissionId, manifestStatus, "write_manifest", summaryNode["layoutRevisionId"]?.GetValue<string>() ?? "", LastFindingCode(findings), generationLock.JobId);
+                    return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
                 }
+
+                WriteMissionState(missionDir, template.MissionId, "PASS", "verify", summaryNode["layoutRevisionId"]?.GetValue<string>() ?? "", LastFindingCode(findings), generationLock.JobId);
             }
 
             var verificationPassed = string.Equals(manifestStatus, "PASS", StringComparison.Ordinal);
@@ -384,22 +453,23 @@ namespace BreachScenarioEngine.Mcp.Editor
                 if (!string.Equals(layoutRevisionId, expectedRevisionId, StringComparison.Ordinal))
                 {
                     findings.Add(Finding("error", "ORDER_VIOLATION_STALE_LAYOUT_GRAPH", "write_manifest requires the current layoutRevisionId from verification", ToRepoPath(summaryPath)));
+                    WriteMissionState(missionDir, template.MissionId, "BLOCKED", "write_manifest", layoutRevisionId, LastFindingCode(findings), generationLock.JobId);
                     return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
                 }
             }
 
-            if (!GenerationLockSet.TryAcquire(template.MissionId, missionDir, manifestPath, out var generationLocks, out var conflictPath))
+            if (!MissionStateAllowsManifest(missionDir, summaryNode, out var stateFinding))
             {
-                findings.Add(Finding("error", "GENERATION_LOCK_CONFLICT", "Another mission generation writer holds a required generation lock", ToRepoPath(conflictPath!)));
+                findings.Add(stateFinding!);
+                WriteMissionState(missionDir, template.MissionId, "BLOCKED", "write_manifest", layoutRevisionId, LastFindingCode(findings), generationLock.JobId);
                 return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
             }
 
-            using (generationLocks!)
-            {
                 var payloadNode = ReadJsonObject(payloadPath);
                 if (verificationPassed && payloadNode == null)
                 {
                     findings.Add(Finding("error", "PAYLOAD_FILE_MISSING", "write_manifest requires mission_payload.generated.json from compile_payload", ToRepoPath(payloadPath)));
+                    WriteMissionState(missionDir, template.MissionId, "BLOCKED", "write_manifest", layoutRevisionId, LastFindingCode(findings), generationLock.JobId);
                     return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
                 }
 
@@ -408,7 +478,6 @@ namespace BreachScenarioEngine.Mcp.Editor
                     ["profileRefs"] = template.ProfileRefs()
                 };
                 Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
-                File.WriteAllText(manifestPath, BuildGenerationManifestNode(template, "PENDING", 0, retrySeeds, layoutRevisionId, payloadNode, summaryNode, artifacts).ToJsonString() + Environment.NewLine);
 
                 var effectiveSeed = 0;
                 if (verificationPassed)
@@ -424,6 +493,7 @@ namespace BreachScenarioEngine.Mcp.Editor
 
                 var manifestNode = BuildGenerationManifestNode(template, manifestStatus, effectiveSeed, retrySeeds, layoutRevisionId, payloadNode, summaryNode, artifacts);
                 File.WriteAllText(manifestPath, manifestNode.ToJsonString() + Environment.NewLine);
+                WriteMissionState(missionDir, template.MissionId, "PASS", "write_manifest", layoutRevisionId, LastFindingCode(findings), generationLock.JobId);
                 AssetDatabase.Refresh();
 
                 return (verificationPassed, MissionResultJson(verificationPassed ? "PASS" : "FAIL", template.MissionId, artifacts, findings));
@@ -471,6 +541,46 @@ namespace BreachScenarioEngine.Mcp.Editor
             }
 
             return (true, missionId, templatePath, null);
+        }
+
+        private static (bool Success, string Message) CleanupGenerationLock(string raw)
+        {
+            var context = ResolveContext(raw);
+            if (!context.Success)
+            {
+                return (false, context.Error!);
+            }
+
+            var missionDir = Path.GetDirectoryName(context.TemplatePath!)!;
+            var missionId = context.MissionId ?? "";
+            if (MissionTemplateModel.TryLoad(context.TemplatePath!, context.MissionId, out var template, out _))
+            {
+                missionId = template!.MissionId;
+            }
+
+            var lockPath = GenerationLockPath(missionDir);
+            var artifacts = new[] { ToRepoPath(lockPath), ToRepoPath(MissionStatePath(missionDir)) };
+            if (!File.Exists(lockPath))
+            {
+                return (true, MissionResultJson("PASS", missionId, artifacts, Array.Empty<JsonObject>()));
+            }
+
+            var lockNode = ReadJsonObject(lockPath);
+            if (!IsStaleLock(lockNode))
+            {
+                return (false, MissionResultJson("FAIL", missionId, artifacts, new[]
+                {
+                    Finding("error", "GENERATION_LOCK_CONFLICT", "Active generation lock was not removed; cleanup only removes stale locks", ToRepoPath(lockPath))
+                }));
+            }
+
+            File.Delete(lockPath);
+            WriteMissionState(missionDir, missionId, "IDLE", "cleanup_generation_lock", lockNode?["layoutRevisionId"]?.GetValue<string>() ?? "", "GENERATION_LOCK_CLEANED", lockNode?["jobId"]?.GetValue<string>() ?? "");
+            AssetDatabase.Refresh();
+            return (true, MissionResultJson("PASS", missionId, artifacts, new[]
+            {
+                Finding("warning", "GENERATION_LOCK_CLEANED", "Stale mission generation lock was removed", ToRepoPath(lockPath))
+            }));
         }
 
         private static JsonObject BuildPayloadNode(MissionTemplateModel template)
@@ -567,7 +677,7 @@ namespace BreachScenarioEngine.Mcp.Editor
 
             return new JsonObject
             {
-                ["schemaVersion"] = "bse.mission_layout.v2.2",
+                ["schemaVersion"] = "bse.mission_layout.v2.3",
                 ["pipelineVersion"] = PipelineVersion,
                 ["missionId"] = template.MissionId,
                 ["layoutRevisionId"] = revisionId,
@@ -775,7 +885,7 @@ namespace BreachScenarioEngine.Mcp.Editor
 
             return new JsonObject
             {
-                ["schemaVersion"] = "bse.mission_entities.v2.2",
+                ["schemaVersion"] = "bse.mission_entities.v2.3",
                 ["pipelineVersion"] = PipelineVersion,
                 ["missionId"] = template.MissionId,
                 ["layoutRevisionId"] = revisionId,
@@ -1156,7 +1266,7 @@ namespace BreachScenarioEngine.Mcp.Editor
         {
             return new JsonObject
             {
-                ["schemaVersion"] = "bse.verification_summary.v2.2",
+                ["schemaVersion"] = "bse.verification_summary.v2.3",
                 ["pipelineVersion"] = PipelineVersion,
                 ["missionId"] = missionId,
                 ["status"] = status,
@@ -1192,7 +1302,8 @@ namespace BreachScenarioEngine.Mcp.Editor
             var summaryNode = failedSummary;
             while (retrySeeds.Count < template.MaxRetries)
             {
-                var retrySeed = DeriveRetrySeed(template.InitialSeed, template.MissionId, retrySeeds.Count + 1);
+                var failureCode = FirstErrorCode(summaryNode);
+                var retrySeed = DeriveRetrySeed(template.InitialSeed, template.MissionId, retrySeeds.Count + 1, failureCode);
                 retrySeeds.Add(retrySeed);
 
                 var layoutNode = BuildLayoutNode(template, retrySeed);
@@ -1268,10 +1379,10 @@ namespace BreachScenarioEngine.Mcp.Editor
             return template.InitialSeed;
         }
 
-        private static int DeriveRetrySeed(int requestedSeed, string missionId, int retryIndex)
+        private static int DeriveRetrySeed(int requestedSeed, string missionId, int retryIndex, string failureCode)
         {
             using var sha = SHA256.Create();
-            var source = $"{requestedSeed}:{missionId}:{retryIndex}:{PipelineVersion}";
+            var source = $"{requestedSeed}:{missionId}:{retryIndex}:{failureCode}:{PipelineVersion}";
             var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(source));
             var value = BitConverter.ToInt32(bytes, 0) & int.MaxValue;
             return value == 0 ? retryIndex : value;
@@ -1463,15 +1574,16 @@ namespace BreachScenarioEngine.Mcp.Editor
         {
             return new JsonObject
             {
-                ["schemaVersion"] = "bse.generation_manifest.v2.2",
+                ["schemaVersion"] = "bse.generation_manifest.v2.3",
                 ["pipelineVersion"] = PipelineVersion,
                 ["missionId"] = template.MissionId,
                 ["status"] = status,
                 ["requestedSeed"] = template.InitialSeed,
                 ["effectiveSeed"] = effectiveSeed,
                 ["retrySeeds"] = new JsonArray(retrySeeds.Select(s => (JsonNode?)JsonValue.Create(s)).ToArray()),
+                ["acceptedAttempt"] = effectiveSeed > 0 && retrySeeds.Count > 0 && retrySeeds[^1] == effectiveSeed ? retrySeeds.Count : 0,
                 ["layoutRevisionId"] = layoutRevisionId,
-                ["lockOwner"] = "bse-pipeline",
+                ["lockOwner"] = LockOwner,
                 ["profileRefs"] = (payloadNode["profileRefs"] as JsonObject)?.DeepClone() ?? template.ProfileRefs(),
                 ["artifacts"] = ManifestArtifactsObject(artifacts),
                 ["verification"] = new JsonObject
@@ -1492,7 +1604,8 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["compileReport"] = unique.FirstOrDefault(p => p.EndsWith("mission_compile_report.json", StringComparison.Ordinal)) ?? "",
                 ["layout"] = unique.FirstOrDefault(p => p.EndsWith("mission_layout.generated.json", StringComparison.Ordinal)) ?? "",
                 ["entities"] = unique.FirstOrDefault(p => p.EndsWith("mission_entities.generated.json", StringComparison.Ordinal)) ?? "",
-                ["verificationSummary"] = unique.FirstOrDefault(p => p.EndsWith("verification_summary.json", StringComparison.Ordinal)) ?? ""
+                ["verificationSummary"] = unique.FirstOrDefault(p => p.EndsWith("verification_summary.json", StringComparison.Ordinal)) ?? "",
+                ["missionState"] = unique.FirstOrDefault(p => p.EndsWith("mission_state.json", StringComparison.Ordinal)) ?? ""
             };
             return result;
         }
@@ -1560,75 +1673,162 @@ namespace BreachScenarioEngine.Mcp.Editor
             }
         }
 
-        private static string GenerationLockRoot(string missionId)
-        {
-            return Path.Combine(ProjectRoot(), "Temp", "BseGenerationLocks", SafeLockName(missionId));
-        }
-
-        private static string SafeLockName(string value)
-        {
-            var safe = new string(value.Select(c => char.IsLetterOrDigit(c) || c == '_' || c == '-' ? c : '_').ToArray());
-            return string.IsNullOrWhiteSpace(safe) ? "unknown_mission" : safe;
-        }
-
-        private static IReadOnlyList<(string Resource, string Path)> GenerationLockPaths(string missionId, string manifestPath)
-        {
-            var root = GenerationLockRoot(missionId);
-            return new[]
-            {
-                ("mission id", Path.Combine(root, "mission.lock")),
-                ("MissionConfig asset", Path.Combine(root, "mission_config_asset.lock")),
-                ("generated scene root", Path.Combine(root, "generated_scene_root.lock")),
-                ("manifest file", manifestPath + ".lock")
-            };
-        }
-
         private sealed class GenerationLockSet : IDisposable
         {
-            private readonly List<(FileStream Stream, string Path)> _locks = new();
+            private FileStream? _stream;
+            private readonly string _path;
+            public string JobId { get; }
 
-            private GenerationLockSet()
+            private GenerationLockSet(FileStream stream, string path, string jobId)
             {
+                _stream = stream;
+                _path = path;
+                JobId = jobId;
             }
 
-            public static bool TryAcquire(string missionId, string missionDir, string manifestPath, out GenerationLockSet? lockSet, out string? conflictPath)
+            public static bool TryAcquire(
+                string missionId,
+                string missionDir,
+                string currentStep,
+                out GenerationLockSet? lockSet,
+                out string? conflictPath,
+                out JsonObject? conflictFinding)
             {
-                lockSet = new GenerationLockSet();
+                var path = GenerationLockPath(missionDir);
+                var jobId = Guid.NewGuid().ToString("N");
+                lockSet = null;
                 conflictPath = null;
-
-                foreach (var (resource, path) in GenerationLockPaths(missionId, manifestPath))
+                conflictFinding = null;
+                try
                 {
-                    try
-                    {
-                        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                        var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                        var body = Encoding.UTF8.GetBytes($"bse-pipeline {DateTime.UtcNow:O} {resource} {ToRepoPath(missionDir)}");
-                        stream.Write(body, 0, body.Length);
-                        stream.Flush();
-                        lockSet._locks.Add((stream, path));
-                    }
-                    catch (IOException)
-                    {
-                        conflictPath = path;
-                        lockSet.Dispose();
-                        lockSet = null;
-                        return false;
-                    }
+                    Directory.CreateDirectory(missionDir);
+                    var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                    var now = DateTime.UtcNow;
+                    var bodyNode = BuildLockNode(missionId, jobId, currentStep, now);
+                    var body = Encoding.UTF8.GetBytes(bodyNode.ToJsonString() + Environment.NewLine);
+                    stream.Write(body, 0, body.Length);
+                    stream.Flush();
+                    lockSet = new GenerationLockSet(stream, path, jobId);
+                    return true;
                 }
-
-                return true;
+                catch (IOException)
+                {
+                    conflictPath = path;
+                    var existingLock = ReadJsonObject(path);
+                    var staleSuffix = IsStaleLock(existingLock) ? " The lock appears stale; run cleanup_generation_lock for this mission to remove it diagnostically." : "";
+                    conflictFinding = Finding("error", "GENERATION_LOCK_CONFLICT", "Another mission generation writer holds the mission generation lock." + staleSuffix, ToRepoPath(path));
+                    return false;
+                }
             }
 
             public void Dispose()
             {
-                foreach (var (stream, path) in _locks)
+                if (_stream == null)
                 {
-                    stream.Dispose();
-                    TryDeleteFile(path);
+                    return;
                 }
 
-                _locks.Clear();
+                _stream.Dispose();
+                _stream = null;
+                TryDeleteFile(_path);
             }
+        }
+
+        private static string GenerationLockPath(string missionDir)
+        {
+            return Path.Combine(missionDir, ".generation.lock");
+        }
+
+        private static string MissionStatePath(string missionDir)
+        {
+            return Path.Combine(missionDir, "mission_state.json");
+        }
+
+        private static JsonObject BuildLockNode(string missionId, string jobId, string currentStep, DateTime now)
+        {
+            return new JsonObject
+            {
+                ["missionId"] = missionId,
+                ["jobId"] = jobId,
+                ["lockOwner"] = LockOwner,
+                ["startedAtUtc"] = now.ToString("O", CultureInfo.InvariantCulture),
+                ["updatedAtUtc"] = now.ToString("O", CultureInfo.InvariantCulture),
+                ["currentStep"] = currentStep,
+                ["processId"] = System.Diagnostics.Process.GetCurrentProcess().Id
+            };
+        }
+
+        private static bool IsStaleLock(JsonObject? lockNode)
+        {
+            if (lockNode == null)
+            {
+                return false;
+            }
+
+            var updated = lockNode["updatedAtUtc"]?.GetValue<string>() ?? lockNode["startedAtUtc"]?.GetValue<string>() ?? "";
+            return DateTime.TryParse(updated, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var updatedAt) &&
+                DateTime.UtcNow - updatedAt > TimeSpan.FromMinutes(30);
+        }
+
+        private static void WriteMissionState(string missionDir, string missionId, string status, string currentStep, string layoutRevisionId, string lastFindingCode, string jobId)
+        {
+            Directory.CreateDirectory(missionDir);
+            var path = MissionStatePath(missionDir);
+            var existing = ReadJsonObject(path);
+            var startedAt = existing?["startedAtUtc"]?.GetValue<string>() ?? DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+            var node = new JsonObject
+            {
+                ["missionId"] = missionId,
+                ["pipelineVersion"] = PipelineVersion,
+                ["status"] = status,
+                ["currentStep"] = currentStep,
+                ["startedAtUtc"] = startedAt,
+                ["updatedAtUtc"] = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+                ["jobId"] = jobId,
+                ["lockOwner"] = LockOwner,
+                ["layoutRevisionId"] = layoutRevisionId,
+                ["lastFindingCode"] = lastFindingCode
+            };
+            File.WriteAllText(path, node.ToJsonString() + Environment.NewLine);
+        }
+
+        private static bool MissionStateAllowsManifest(string missionDir, JsonObject summaryNode, out JsonObject? finding)
+        {
+            finding = null;
+            var statePath = MissionStatePath(missionDir);
+            var state = ReadJsonObject(statePath);
+            if (state == null)
+            {
+                finding = Finding("error", "MISSION_STATE_INCOMPATIBLE", "write_manifest requires mission_state.json from a passing verify step", ToRepoPath(statePath));
+                return false;
+            }
+
+            var stateStatus = state["status"]?.GetValue<string>() ?? "";
+            var summaryStatus = summaryNode["status"]?.GetValue<string>() ?? "";
+            var stateLayout = state["layoutRevisionId"]?.GetValue<string>() ?? "";
+            var summaryLayout = summaryNode["layoutRevisionId"]?.GetValue<string>() ?? "";
+            if (!string.Equals(stateStatus, "PASS", StringComparison.Ordinal) ||
+                !string.Equals(summaryStatus, "PASS", StringComparison.Ordinal) ||
+                string.IsNullOrWhiteSpace(summaryLayout) ||
+                !string.Equals(stateLayout, summaryLayout, StringComparison.Ordinal))
+            {
+                finding = Finding("error", "MISSION_STATE_INCOMPATIBLE", "write_manifest requires PASS mission_state.json matching verification_summary.layoutRevisionId", ToRepoPath(statePath));
+                return false;
+            }
+
+            return true;
+        }
+
+        private static string LastFindingCode(IEnumerable<JsonObject> findings)
+        {
+            return findings.LastOrDefault(f => f["code"] != null)?["code"]?.GetValue<string>() ?? "";
+        }
+
+        private static string FirstErrorCode(JsonObject summaryNode)
+        {
+            return (summaryNode["findings"] as JsonArray)?
+                .OfType<JsonObject>()
+                .FirstOrDefault(f => string.Equals(f["severity"]?.GetValue<string>(), "error", StringComparison.Ordinal))?["code"]?.GetValue<string>() ?? "";
         }
 
         private static JsonArray FindingsArray(IEnumerable<JsonObject> findings)
@@ -1971,7 +2171,6 @@ namespace BreachScenarioEngine.Mcp.Editor
                 Required(template.MissionId, "missionId", findings);
                 Required(template.MissionTitle, "missionTitle", findings);
                 Required(template._seenFields.Contains("generationMeta.initialSeed"), "generationMeta.initialSeed", findings);
-                Required(template._seenFields.Contains("generationMeta.effectiveSeed"), "generationMeta.effectiveSeed", findings);
                 Required(template._seenFields.Contains("generationMeta.generationTimeout"), "generationMeta.generationTimeout", findings);
                 Required(template._seenFields.Contains("generationMeta.maxRetries"), "generationMeta.maxRetries", findings);
                 Required(template.WorldBounds.Length == 2, "spatialConstraints.worldBounds", findings);
@@ -2314,3 +2513,4 @@ namespace BreachScenarioEngine.Mcp.Editor
         }
     }
 }
+

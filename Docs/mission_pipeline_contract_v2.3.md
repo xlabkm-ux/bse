@@ -59,6 +59,7 @@ The public mission surface is:
 - `manage_mission(action="place_entities")`
 - `manage_mission(action="verify")`
 - `manage_mission(action="write_manifest")`
+- `manage_mission(action="cleanup_generation_lock")`
 
 Each action returns one JSON decision envelope. The JSON may be serialized into
 tool result text by the Unity bridge, but callers must be able to parse it as

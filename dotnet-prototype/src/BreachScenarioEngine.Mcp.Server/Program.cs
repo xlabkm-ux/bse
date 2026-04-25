@@ -896,6 +896,7 @@ $"[CreateAssetMenu(menuName = \"Breach Scenario Engine MCP/{Ident(name)}\")]\n" 
             "place_entities" => Bridge("manage_mission", InjectArg(a, "action", "place_entities")),
             "verify" => Bridge("manage_mission", InjectArg(a, "action", "verify")),
             "write_manifest" => Bridge("manage_mission", InjectArg(a, "action", "write_manifest")),
+            "cleanup_generation_lock" => Bridge("manage_mission", InjectArg(a, "action", "cleanup_generation_lock")),
             _ => Err($"Unsupported manage_mission action: {action}")
         };
     }

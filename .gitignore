@@ -28,6 +28,7 @@ UserMissionSources/**/mission_compile_report.json
 UserMissionSources/**/mission_layout.generated.json
 UserMissionSources/**/mission_entities.generated.json
 UserMissionSources/**/mission_state.json
+UserMissionSources/**/.generation.lock
 UserMissionSources/**/generation_manifest.json
 UserMissionSources/**/verification_summary.json
 UserMissionSources/**/codex_review.json

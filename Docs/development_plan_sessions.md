@@ -87,7 +87,7 @@ Handoff note:
 
 Status:
 
-- pending
+- completed
 
 Goal:
 
@@ -100,6 +100,33 @@ Work:
 - define lifecycle states and current-step updates
 - add safe unlock behavior, stale lock handling, and diagnostic cleanup
 - keep `write_manifest` blocked when lifecycle state is incompatible
+
+Completed:
+
+- added mission-scoped `.generation.lock` under each mission directory
+- added `mission_state.json` lifecycle writes for compile, layout, placement,
+  verification, retry, manifest, and cleanup transitions
+- added explicit stale-lock diagnostic cleanup through
+  `manage_mission(action="cleanup_generation_lock")`
+- changed failed/blocked manifest attempts to update `mission_state.json`
+  without writing a failed `generation_manifest.json`
+- kept `write_manifest` gated on PASS verification and compatible PASS mission
+  state
+- updated retry seed derivation to include the verification failure code
+
+Exit criteria:
+
+- generated mission writes are mission-lock guarded
+- lock conflicts return `GENERATION_LOCK_CONFLICT`
+- stale lock cleanup is explicit and diagnostic
+- `write_manifest` writes accepted manifests only after compatible PASS state
+
+Handoff note:
+
+- "Generation locks and mission lifecycle are now v2.3-aligned. Continue with
+  validation and payload fidelity: split template findings into the v2.3
+  `TPL_*` family, add invalid fixtures, document or replace the YAML subset
+  parser, and add repo-owned JSON Schema validation."
 
 ### v2.3 Session 4: Validation and Payload Fidelity
 
@@ -171,12 +198,13 @@ Completed:
 - Unity editor compilation was verified against the embedded package
 - retry execution returns retryable verification failures to Step 6 before
   writing the manifest
+- mission-scoped `.generation.lock` guards generated mission writes
+- `mission_state.json` records lifecycle state and blocks incompatible manifest
+  writes
 
 Pending:
 
-- generation locks
 - richer template validation and schema fidelity
-- manifest/status lifecycle updates
 
 ## Session 1: Contract Stabilization
 

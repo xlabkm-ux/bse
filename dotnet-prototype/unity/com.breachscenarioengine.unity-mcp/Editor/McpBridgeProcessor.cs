@@ -1357,12 +1357,13 @@ namespace BreachScenarioEngine.Mcp.Editor
         AddCapability(capabilities, "manage_build", "profiles", true, "Current runtime exposes active build target switching.");
         AddCapability(capabilities, "manage_build", "scenes", true, "Build scene list access is supported.");
 
-        AddCapability(capabilities, "manage_mission", "validate_template", true, "Mission template validation for the v2.2 authoring contract is supported.");
-        AddCapability(capabilities, "manage_mission", "compile_payload", true, "Mission payload and compile report generation for the v2.2 data contract is supported.");
+        AddCapability(capabilities, "manage_mission", "validate_template", true, "Mission template validation for the v2.3 authoring contract is supported.");
+        AddCapability(capabilities, "manage_mission", "compile_payload", true, "Mission payload and compile report generation for the v2.3 data contract is supported.");
         AddCapability(capabilities, "manage_mission", "generate_layout", true, "Deterministic mission layout and tactical graph generation is supported.");
         AddCapability(capabilities, "manage_mission", "place_entities", true, "Layout-gated actor and objective placement is supported.");
         AddCapability(capabilities, "manage_mission", "verify", true, "Mission verification summary generation is supported.");
         AddCapability(capabilities, "manage_mission", "write_manifest", true, "Generation manifest writing after PASS verification is supported.");
+        AddCapability(capabilities, "manage_mission", "cleanup_generation_lock", true, "Stale mission-scoped generation lock cleanup is supported.");
 
         AddCapability(capabilities, "run_tests", "run", true, "Test execution is supported.");
         AddCapability(capabilities, "get_test_job", "poll", true, "Test job polling is supported.");

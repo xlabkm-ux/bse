@@ -276,7 +276,8 @@
             "generate_layout",
             "place_entities",
             "verify",
-            "write_manifest"
+            "write_manifest",
+            "cleanup_generation_lock"
           ]
         },
         "missionId": { "type": "string" },
@@ -305,3 +306,4 @@
     }
   }
 }
+

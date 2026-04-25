@@ -699,6 +699,7 @@ public sealed class DispatcherTests
     [InlineData("place_entities")]
     [InlineData("verify")]
     [InlineData("write_manifest")]
+    [InlineData("cleanup_generation_lock")]
     public void HandleToolCall_ManageMission_QueuesBridgeCommand(string action)
     {
         var root = Path.Combine(Path.GetTempPath(), "breach-mcp-test-" + Guid.NewGuid().ToString("N"));

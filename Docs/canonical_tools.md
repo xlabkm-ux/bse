@@ -30,6 +30,7 @@ The actual runtime inventory is documented separately in `runtime_tools.md`.
 - `manage_mission(action="place_entities")`
 - `manage_mission(action="verify")`
 - `manage_mission(action="write_manifest")`
+- `manage_mission(action="cleanup_generation_lock")`
 
 ## Required Mission Artifacts
 
