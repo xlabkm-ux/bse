@@ -2,67 +2,69 @@
 schemaVersion: "tb.mission_template.v2.3"
 
 # Unique mission id. Must match the containing folder name.
-missionId: "VS01_HostageApartment"
+missionId: "VS02_DataRaidOffice"
 
 # Human-readable mission title shown by pilot runtime UI.
-missionTitle: "Hostage Apartment"
+missionTitle: "Data Raid Office"
 
 generationMeta:
-  # Baseline deterministic seed for the VS01 regression mission.
-  initialSeed: 428193
-  # Legacy compatibility only. The pipeline owns the accepted effective seed.
+  # Authored deterministic seed. The pipeline writes the accepted effective seed.
+  initialSeed: 731204
+  # Legacy compatibility only. Keep zero in authored templates.
   effectiveSeed: 0
-  generationTimeout: 45
+  generationTimeout: 60
   maxRetries: 5
 
 spatialConstraints:
-  # Width and height of the generated mission space in Unity units.
-  worldBounds: [64, 64]
+  # Wider office footprint used to exercise alternate routes and density.
+  worldBounds: [80, 64]
   pixelsPerUnit: 128
   tacticalTheme: "urban_cqb"
   bspConstraints:
-    minRoomSize: [4, 4]
-    maxRoomSize: [12, 12]
+    minRoomSize: [5, 5]
+    maxRoomSize: [14, 12]
     corridorWidth: 2
     forceRoomAdjacency: true
 
 tacticalRules:
-  noiseAlertThreshold: 0.15
+  noiseAlertThreshold: 0.22
   strictNavigationPolicy: true
   enforcePostLayoutPlacement: true
   acousticOcclusion:
-    wallMultiplier: 2.5
-    doorPenalty: 1.2
+    wallMultiplier: 2.2
+    doorPenalty: 1.0
 
 actorRoster:
+  # Entry team starts only at generated breach/entry nodes.
   - id: "OP_01"
     type: "Operative"
-    countRange: [2, 4]
+    countRange: [3, 4]
     navigationPolicy: "FullAccess"
     placementPolicy: "EntryPointOnly"
+
+  # Static guards prefer tagged objective/security rooms after layout exists.
   - id: "EN_01"
     type: "Sentry"
-    countRange: [3, 6]
+    countRange: [4, 7]
     navigationPolicy: "StaticGuard"
     placementPolicy: "PostLayout_TaggedRoom"
+
+  # Roamers verify non-hostage placement in several rooms.
   - id: "EN_02"
     type: "Roamer"
-    countRange: [1, 2]
+    countRange: [2, 3]
     navigationPolicy: "CanOpenDoors"
     placementPolicy: "PostLayout_AnyRoom"
-  - id: "CIV_01"
-    type: "Hostage"
-    countRange: [1, 2]
-    navigationPolicy: "Immobilized"
-    placementPolicy: "SecureRoomOnly"
 
 objectives:
   primary:
-    - id: "OBJ_MAIN"
-      type: "RescueHostage"
+    # Main data objective must resolve against the generated layout graph.
+    - id: "OBJ_DATA_MAIN"
+      type: "CollectItem"
       requiresLayoutGraph: true
       targetRoomTag: "security_vault"
   secondary:
-    - id: "OBJ_DATA"
+    # Optional backup media checks secondary objective placement.
+    - id: "OBJ_SERVER_BACKUP"
       type: "CollectItem"
       optional: true

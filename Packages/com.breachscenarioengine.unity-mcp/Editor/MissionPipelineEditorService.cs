@@ -686,7 +686,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             var revisionId = ComputeLayoutRevisionId(template, generationSeed);
             var rooms = BuildRooms(template, revisionId);
             var portals = BuildPortals(revisionId, rooms);
-            var coverPoints = BuildCoverPoints(revisionId, rooms);
+            var coverPoints = BuildCoverPoints(revisionId, rooms, template);
 
             return new JsonObject
             {
@@ -791,16 +791,33 @@ namespace BreachScenarioEngine.Mcp.Editor
             };
         }
 
-        private static List<JsonObject> BuildCoverPoints(string revisionId, IReadOnlyList<JsonObject> rooms)
+        private static List<JsonObject> BuildCoverPoints(string revisionId, IReadOnlyList<JsonObject> rooms, MissionTemplateModel template)
         {
-            return rooms.Select((room, index) => new JsonObject
+            if (rooms.Count == 0)
             {
-                ["id"] = $"cover_{index + 1:00}",
-                ["layoutRevisionId"] = revisionId,
-                ["roomId"] = room["id"]!.GetValue<string>(),
-                ["navNodeId"] = room["navNodeId"]!.GetValue<string>(),
-                ["quality"] = index == 0 ? "low" : "medium"
-            }).ToList();
+                return new List<JsonObject>();
+            }
+
+            var coverBudget = Math.Max(rooms.Count, template.Actors
+                .Where(actor => actor.Type.Contains("Sentry", StringComparison.OrdinalIgnoreCase) ||
+                                actor.Type.Contains("Roamer", StringComparison.OrdinalIgnoreCase))
+                .Sum(actor => actor.NormalizedCount));
+
+            var coverPoints = new List<JsonObject>();
+            for (var index = 0; index < coverBudget; index++)
+            {
+                var room = rooms[index % rooms.Count];
+                coverPoints.Add(new JsonObject
+                {
+                    ["id"] = $"cover_{index + 1:00}",
+                    ["layoutRevisionId"] = revisionId,
+                    ["roomId"] = room["id"]!.GetValue<string>(),
+                    ["navNodeId"] = room["navNodeId"]!.GetValue<string>(),
+                    ["quality"] = index == 0 ? "low" : "medium"
+                });
+            }
+
+            return coverPoints;
         }
 
         private static JsonObject BuildVisibilityGraph(string revisionId, IReadOnlyList<JsonObject> rooms)

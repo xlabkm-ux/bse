@@ -2,67 +2,76 @@
 schemaVersion: "tb.mission_template.v2.3"
 
 # Unique mission id. Must match the containing folder name.
-missionId: "VS01_HostageApartment"
+missionId: "VS03_StealthSafehouse"
 
 # Human-readable mission title shown by pilot runtime UI.
-missionTitle: "Hostage Apartment"
+missionTitle: "Stealth Safehouse"
 
 generationMeta:
-  # Baseline deterministic seed for the VS01 regression mission.
-  initialSeed: 428193
-  # Legacy compatibility only. The pipeline owns the accepted effective seed.
+  # Authored deterministic seed. The pipeline writes the accepted effective seed.
+  initialSeed: 912447
+  # Legacy compatibility only. Keep zero in authored templates.
   effectiveSeed: 0
-  generationTimeout: 45
-  maxRetries: 5
+  generationTimeout: 60
+  maxRetries: 7
 
 spatialConstraints:
-  # Width and height of the generated mission space in Unity units.
-  worldBounds: [64, 64]
+  # Compact stealth footprint with stricter acoustic rules.
+  worldBounds: [72, 56]
   pixelsPerUnit: 128
-  tacticalTheme: "urban_cqb"
+  tacticalTheme: "stealth_facility"
   bspConstraints:
     minRoomSize: [4, 4]
-    maxRoomSize: [12, 12]
+    maxRoomSize: [10, 10]
     corridorWidth: 2
     forceRoomAdjacency: true
 
 tacticalRules:
-  noiseAlertThreshold: 0.15
+  noiseAlertThreshold: 0.10
   strictNavigationPolicy: true
   enforcePostLayoutPlacement: true
   acousticOcclusion:
-    wallMultiplier: 2.5
-    doorPenalty: 1.2
+    wallMultiplier: 3.5
+    doorPenalty: 1.8
 
 actorRoster:
+  # Small entry team emphasizes stealth route validation.
   - id: "OP_01"
     type: "Operative"
-    countRange: [2, 4]
+    countRange: [2, 3]
     navigationPolicy: "FullAccess"
     placementPolicy: "EntryPointOnly"
+
+  # Static guards exercise safe tagged-room placement.
   - id: "EN_01"
     type: "Sentry"
-    countRange: [3, 6]
+    countRange: [3, 5]
     navigationPolicy: "StaticGuard"
     placementPolicy: "PostLayout_TaggedRoom"
+
+  # Low roamer count prevents excessive density in the stealth mission.
   - id: "EN_02"
     type: "Roamer"
     countRange: [1, 2]
     navigationPolicy: "CanOpenDoors"
     placementPolicy: "PostLayout_AnyRoom"
+
+  # Hostage must be placed only after a current layout exists.
   - id: "CIV_01"
     type: "Hostage"
-    countRange: [1, 2]
+    countRange: [1, 1]
     navigationPolicy: "Immobilized"
     placementPolicy: "SecureRoomOnly"
 
 objectives:
   primary:
-    - id: "OBJ_MAIN"
+    # Rescue objective verifies acoustic and navigation reachability together.
+    - id: "OBJ_EXTRACT_HOSTAGE"
       type: "RescueHostage"
       requiresLayoutGraph: true
       targetRoomTag: "security_vault"
   secondary:
-    - id: "OBJ_DATA"
-      type: "CollectItem"
+    # Optional non-alarm objective documents the stealth success condition.
+    - id: "OBJ_NO_ALARM"
+      type: "AvoidAlarm"
       optional: true

@@ -13,6 +13,44 @@ The v2.2 mission pipeline sessions below are functionally complete. New chats
 should continue the v2.3 stabilization track unless the user asks for a
 different task.
 
+### Pilot Operation Preparation: 2-3 Mission Slice
+
+Status:
+
+- completed
+
+Goal:
+
+- prepare the repository for pilot operation across VS01, VS02, and VS03
+
+Completed:
+
+- added pilot mission templates for `VS02_DataRaidOffice` and
+  `VS03_StealthSafehouse`
+- kept `VS01_HostageApartment` as the regression baseline with seed `428193`
+- added `MissionConfig` assets for VS01, VS02, and VS03
+- added runtime loading and debug scene construction from accepted manifests
+- added pilot debug placeholders under `Assets/Prefabs/Pilot/`
+- added `Assets/Scenes/MissionBootstrap.unity`
+- added `PilotMissionPipelineCi.RunAll` and smoke tests
+- added `.github/workflows/pilot-mission-ci.yml`
+- added `Docs/pilot_operation_checklist.md`
+- expanded layout cover generation so pilot tactical density gates can satisfy
+  higher enemy counts when the template requests them
+- generated accepted v2.3 artifacts for all three pilot missions through the
+  pipeline
+
+Verification:
+
+- Unity batchmode `BreachScenarioEngine.Editor.CI.PilotMissionPipelineCi.RunAll`
+  passed for VS01, VS02, and VS03
+- Unity EditMode smoke tests passed for `Assembly-CSharp-Editor`
+
+Handoff note:
+
+- "Pilot operation preparation is in place. Next work can focus on richer
+  playable interactions, real art-prefab mapping, and CI runner licensing."
+
 ### v2.3 Session 1: Current-State Audit
 
 Status:

@@ -1,0 +1,22 @@
+name: Pilot Mission CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  unity-pilot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Unity EditMode pilot mission pipeline
+        run: |
+          echo "Run Unity batchmode pipeline with:"
+          echo "Unity -batchmode -projectPath . -executeMethod BreachScenarioEngine.Editor.CI.PilotMissionPipelineCi.RunAll -quit"
+      - name: Upload pilot report artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pilot-mission-reports
+          path: Artifacts/PilotReports
