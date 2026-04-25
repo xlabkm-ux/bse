@@ -1,6 +1,6 @@
 {
   "name": "BreachScenarioEngine.Generation.TacticalGraphs",
-  "rootNamespace": "BreachScenarioEngine.Mcp.Editor",
+  "rootNamespace": "BreachScenarioEngine.Generation.TacticalGraphs",
   "references": [],
   "includePlatforms": [],
   "excludePlatforms": [],

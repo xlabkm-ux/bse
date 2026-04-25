@@ -363,7 +363,7 @@ Handoff note:
 
 Status:
 
-- in_progress
+- completed
 
 Goal:
 
@@ -381,10 +381,14 @@ Work:
 Completed:
 
 - added repo-owned runtime builders for cover, visibility, and hearing graphs
+- moved the runtime tactical graph namespace to
+  `BreachScenarioEngine.Generation.TacticalGraphs`
 - added a runtime `BreachScenarioEngine.Generation.TacticalGraphs` asmdef so
   the new layer compiles independently
 - kept `TacticalGraphBuilder` in the editor package as the compatibility facade
   for verification metrics and legacy call sites
+- updated the editor-side layout generator and verification service to import
+  the runtime tactical graph namespace explicitly
 - restored the package-side layout generator to the stable compile path while
   the runtime boundary is being wired
 
@@ -395,6 +399,9 @@ Verification:
   was added
 - the active tactical graph tests still exercise deterministic graph and
   metric output through the compatibility facade
+- Unity batchmode compile also succeeded after the runtime namespace was
+  separated from the editor namespace and the editor-side generators imported
+  `BreachScenarioEngine.Generation.TacticalGraphs`
 
 Exit criteria:
 
@@ -405,10 +412,10 @@ Exit criteria:
 
 Handoff note:
 
-- "Tactical graph generation has been transferred into repo-owned runtime
-  files and is compiling cleanly. Wire the package to the runtime layer next,
-  then continue with the next phase of the transfer plan by expanding or
-  hardening the verification and content-facing runtime modules."
+- "Tactical graph generation now lives in repo-owned runtime files, the editor
+  package consumes the runtime namespace directly, and the compile path is
+  clean. Continue by expanding or hardening the verification and
+  content-facing runtime modules."
 
 ## Active Continuation: v2.3 Stabilization
 

@@ -5,7 +5,7 @@ using System.Text.Json.Nodes;
 
 #nullable enable
 
-namespace BreachScenarioEngine.Mcp.Editor
+namespace BreachScenarioEngine.Generation.TacticalGraphs
 {
     public static class HearingGraphBuilder
     {
