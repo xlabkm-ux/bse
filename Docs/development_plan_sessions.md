@@ -158,7 +158,7 @@ Completed:
 
 Status:
 
-- pending
+- completed
 
 Goal:
 
@@ -169,6 +169,15 @@ Work:
 - add v2.3 verification metrics and retryable/blocking classification
 - include failure code in retry seed derivation if retained by contract
 - preserve Step 6 -> Step 5 -> Step 7 on every retry
+
+Completed:
+
+- added expanded verification metrics for reachability, alternate routes,
+  hearing overlap, chokepoint pressure, and objective room pressure
+- added `retryClass`, `failureCode`, and retryability counts to
+  `verification_summary.json`
+- kept retry derivation tied to the current failure code while preserving
+  Step 6 -> Step 5 -> Step 7 on every retry
 
 ### v2.3 Session 6: Unity Package and Content Layer
 

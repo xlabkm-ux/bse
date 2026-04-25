@@ -48,6 +48,5 @@ The inventory is target-only.
 - `write_manifest` owns retry execution for retryable Step 7 failures: it returns to `generate_layout`, reruns placement and verification, records deterministic `retrySeeds`, and writes the manifest only after PASS.
 - Mission writes use the mission-scoped `.generation.lock`, lifecycle transitions are recorded in `mission_state.json`, and stale locks require explicit `cleanup_generation_lock`.
 - Mission pipeline regression coverage now includes direct Unity service tests, bridge route/capability checks, server dispatcher routing for every public mission action, and default artifact path creation.
-- Active project documentation now targets v2.3. Current runtime gaps against
-  that contract now center on expanded verification metrics and the remaining
-  content-layer alignment work.
+- Active project documentation now targets v2.3. The remaining runtime gaps
+  now center on content-layer alignment work.

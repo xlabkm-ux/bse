@@ -67,6 +67,10 @@ The user template owns only the requested seed through
   },
   "verification": {
     "status": "PASS",
+    "retryClass": "PASS",
+    "failureCode": "",
+    "retryableFailureCount": 0,
+    "blockingFailureCount": 0,
     "findings": [],
     "metrics": {
       "enemyCount": 0,
@@ -76,11 +80,14 @@ The user template owns only the requested seed through
       "activeHearingChecks": 0,
       "visibilityRayCount": 0,
       "unreachableCriticalNodes": 0,
+      "actorCount": 0,
+      "objectiveCount": 0,
+      "coverPointCount": 0,
       "reachableObjectives": 1,
       "unreachableObjectives": 0,
       "averageCoverPerRoom": 0,
-      "hearingOverlapPercentage": 0,
       "alternateRoutes": 0,
+      "hearingOverlapPercentage": 0,
       "chokepointPressure": 0,
       "objectiveRoomPressure": 0
     }
@@ -186,4 +193,3 @@ machine-readable data to prove:
 - tactical density checks passed
 - render and performance budgets passed
 - retryable findings are empty on the accepted attempt
-

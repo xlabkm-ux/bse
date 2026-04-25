@@ -354,10 +354,19 @@ namespace BreachScenarioEngine.Mcp.Editor
             var summary = BuildVerificationSummaryNode(template.MissionId, status, layoutNode?["layoutRevisionId"]?.GetValue<string>() ?? expectedRevisionId, artifacts, findings, metrics);
             Directory.CreateDirectory(Path.GetDirectoryName(summaryPath)!);
             File.WriteAllText(summaryPath, summary.ToJsonString() + Environment.NewLine);
-            WriteMissionState(missionDir, template.MissionId, status == "PASS" ? "PASS" : "FAILED", "verify", summary["layoutRevisionId"]?.GetValue<string>() ?? expectedRevisionId, LastFindingCode(findings), generationLock.JobId);
+            var missionStateStatus = status == "PASS"
+                ? "PASS"
+                : string.Equals(summary["retryClass"]?.GetValue<string>(), "RETRYABLE_FAIL", StringComparison.Ordinal)
+                    ? "FAILED"
+                    : "BLOCKED";
+            WriteMissionState(missionDir, template.MissionId, missionStateStatus, "verify", summary["layoutRevisionId"]?.GetValue<string>() ?? expectedRevisionId, LastFindingCode(findings), generationLock.JobId);
             AssetDatabase.Refresh();
 
-            return (status == "PASS", MissionResultJson(status, template.MissionId, artifacts, findings));
+            return (status == "PASS", MissionResultJson(status, template.MissionId, artifacts, findings, metrics, new JsonObject
+            {
+                ["currentStep"] = "verify",
+                ["jobId"] = generationLock.JobId
+            }));
             }
         }
 
@@ -428,7 +437,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             var manifestStatus = "PASS";
             if (!string.Equals(verificationStatus, "PASS", StringComparison.Ordinal))
             {
-                WriteMissionState(missionDir, template.MissionId, "RETRYING", "write_manifest", summaryNode["layoutRevisionId"]?.GetValue<string>() ?? "", FirstErrorCode(summaryNode), generationLock.JobId);
+                WriteMissionState(missionDir, template.MissionId, "RETRYING", "write_manifest", summaryNode["layoutRevisionId"]?.GetValue<string>() ?? "", VerificationFailureCode(summaryNode), generationLock.JobId);
                 var retryResult = TryRunRetryPipeline(template!, payloadPath, layoutPath, entitiesPath, summaryPath, summaryNode, artifacts, retrySeeds, findings);
                 summaryNode = retryResult.SummaryNode;
                 retrySeeds = retryResult.RetrySeeds;
@@ -496,7 +505,11 @@ namespace BreachScenarioEngine.Mcp.Editor
                 WriteMissionState(missionDir, template.MissionId, "PASS", "write_manifest", layoutRevisionId, LastFindingCode(findings), generationLock.JobId);
                 AssetDatabase.Refresh();
 
-                return (verificationPassed, MissionResultJson(verificationPassed ? "PASS" : "FAIL", template.MissionId, artifacts, findings));
+                return (verificationPassed, MissionResultJson(verificationPassed ? "PASS" : "FAIL", template.MissionId, artifacts, findings, summaryNode["metrics"] as JsonObject, new JsonObject
+                {
+                    ["currentStep"] = "write_manifest",
+                    ["jobId"] = generationLock.JobId
+                }));
             }
         }
 
@@ -1085,7 +1098,14 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["unreachableCriticalNodes"] = 0,
                 ["actorCount"] = 0,
                 ["objectiveCount"] = 0,
-                ["coverPointCount"] = 0
+                ["coverPointCount"] = 0,
+                ["reachableObjectives"] = 0,
+                ["unreachableObjectives"] = 0,
+                ["averageCoverPerRoom"] = 0,
+                ["alternateRoutes"] = 0,
+                ["hearingOverlapPercentage"] = 0,
+                ["chokepointPressure"] = 0,
+                ["objectiveRoomPressure"] = 0
             };
         }
 
@@ -1097,7 +1117,9 @@ namespace BreachScenarioEngine.Mcp.Editor
             var actors = (entitiesNode["actors"] as JsonArray)?.OfType<JsonObject>().ToList() ?? new List<JsonObject>();
             var objectives = (entitiesNode["objectives"] as JsonArray)?.OfType<JsonObject>().ToList() ?? new List<JsonObject>();
             var occupiedRooms = new HashSet<string>(StringComparer.Ordinal);
+            var objectiveRoomOccupancy = new Dictionary<string, int>(StringComparer.Ordinal);
             var unreachableCriticalNodes = 0;
+            var reachableObjectives = 0;
 
             foreach (var entity in actors.Concat(objectives))
             {
@@ -1105,6 +1127,8 @@ namespace BreachScenarioEngine.Mcp.Editor
                 if (!string.IsNullOrWhiteSpace(roomId))
                 {
                     occupiedRooms.Add(roomId);
+                    objectiveRoomOccupancy.TryGetValue(roomId, out var currentOccupancy);
+                    objectiveRoomOccupancy[roomId] = currentOccupancy + 1;
                 }
 
                 if (string.IsNullOrWhiteSpace(roomId) || !roomIds.Contains(roomId) || !reachableRooms.Contains(roomId))
@@ -1114,6 +1138,15 @@ namespace BreachScenarioEngine.Mcp.Editor
                         ? "NAV_OBJECTIVE_UNREACHABLE"
                         : "NAV_ENTITY_UNREACHABLE";
                     findings.Add(Finding("error", code, $"Generated entity is not reachable from the breach entry: {entity["entityId"]?.GetValue<string>() ?? "(unknown)"}"));
+                }
+            }
+
+            foreach (var objective in objectives)
+            {
+                var roomId = objective["roomId"]?.GetValue<string>() ?? "";
+                if (!string.IsNullOrWhiteSpace(roomId) && roomIds.Contains(roomId) && reachableRooms.Contains(roomId))
+                {
+                    reachableObjectives++;
                 }
             }
 
@@ -1131,9 +1164,28 @@ namespace BreachScenarioEngine.Mcp.Editor
                        type.Contains("Sentry", StringComparison.OrdinalIgnoreCase) ||
                        type.Contains("Roamer", StringComparison.OrdinalIgnoreCase);
             });
+            var objectiveRoomIds = objectives
+                .Select(o => o["roomId"]?.GetValue<string>() ?? "")
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            var portalPairs = UndirectedEdgePairs(layoutNode["PortalGraph"]?["portals"] as JsonArray);
+            var visibilityPairs = UndirectedEdgePairs(layoutNode["VisibilityGraph"]?["edges"] as JsonArray);
+            var hearingPairs = UndirectedEdgePairs(layoutNode["HearingGraph"]?["edges"] as JsonArray);
+            var sharedHearingVisibilityPairs = hearingPairs.Intersect(visibilityPairs, StringComparer.Ordinal).Count();
+            var portalDegrees = RoomDegrees(rooms, portalPairs);
             var coverPointCount = (layoutNode["CoverGraph"]?["coverPoints"] as JsonArray)?.Count ?? 0;
             var activeHearingChecks = (layoutNode["HearingGraph"]?["edges"] as JsonArray)?.Count ?? 0;
             var visibilityRayCount = (layoutNode["VisibilityGraph"]?["edges"] as JsonArray)?.Count ?? 0;
+            var alternateRoutes = Math.Max(0, portalPairs.Count - Math.Max(0, rooms.Count - 1));
+            var hearingOverlapPercentage = activeHearingChecks > 0
+                ? Math.Round(sharedHearingVisibilityPairs * 100.0 / activeHearingChecks, 2)
+                : 0;
+            var chokepointRooms = portalDegrees.Values.Count(degree => degree <= 1);
+            var chokepointPressure = rooms.Count > 0 ? Math.Round(chokepointRooms * 100.0 / rooms.Count, 2) : 0;
+            var objectiveRoomPressure = objectiveRoomIds.Count > 0
+                ? Math.Round(objectiveRoomIds.Sum(roomId => objectiveRoomOccupancy.TryGetValue(roomId, out var occupancy) ? occupancy : 0) * 1.0 / objectiveRoomIds.Count, 2)
+                : 0;
 
             if (rooms.Count > 0 && actors.Count > rooms.Count * 6)
             {
@@ -1166,6 +1218,13 @@ namespace BreachScenarioEngine.Mcp.Editor
             metrics["actorCount"] = actors.Count;
             metrics["objectiveCount"] = objectives.Count;
             metrics["coverPointCount"] = coverPointCount;
+            metrics["reachableObjectives"] = reachableObjectives;
+            metrics["unreachableObjectives"] = Math.Max(0, objectives.Count - reachableObjectives);
+            metrics["averageCoverPerRoom"] = rooms.Count > 0 ? Math.Round(coverPointCount * 1.0 / rooms.Count, 2) : 0;
+            metrics["alternateRoutes"] = alternateRoutes;
+            metrics["hearingOverlapPercentage"] = hearingOverlapPercentage;
+            metrics["chokepointPressure"] = chokepointPressure;
+            metrics["objectiveRoomPressure"] = objectiveRoomPressure;
             return metrics;
         }
 
@@ -1264,6 +1323,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             IEnumerable<JsonObject> findings,
             JsonObject metrics)
         {
+            var classification = ClassifyVerificationFindings(findings);
             return new JsonObject
             {
                 ["schemaVersion"] = "bse.verification_summary.v2.3",
@@ -1271,6 +1331,10 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["missionId"] = missionId,
                 ["status"] = status,
                 ["layoutRevisionId"] = layoutRevisionId,
+                ["retryClass"] = status == "PASS" ? "PASS" : classification.RetryClass,
+                ["failureCode"] = status == "PASS" ? "" : classification.FailureCode,
+                ["retryableFailureCount"] = classification.RetryableFailureCount,
+                ["blockingFailureCount"] = classification.BlockingFailureCount,
                 ["artifacts"] = new JsonArray(artifacts.Select(a => (JsonNode?)a).ToArray()),
                 ["findings"] = FindingsArray(findings),
                 ["metrics"] = (JsonObject)metrics.DeepClone()
@@ -1302,7 +1366,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             var summaryNode = failedSummary;
             while (retrySeeds.Count < template.MaxRetries)
             {
-                var failureCode = FirstErrorCode(summaryNode);
+                var failureCode = VerificationFailureCode(summaryNode);
                 var retrySeed = DeriveRetrySeed(template.InitialSeed, template.MissionId, retrySeeds.Count + 1, failureCode);
                 retrySeeds.Add(retrySeed);
 
@@ -1358,6 +1422,17 @@ namespace BreachScenarioEngine.Mcp.Editor
                 return false;
             }
 
+            var retryClass = summaryNode["retryClass"]?.GetValue<string>() ?? "";
+            if (string.Equals(retryClass, "RETRYABLE_FAIL", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (string.Equals(retryClass, "BLOCKED", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
             var errorCodes = (summaryNode["findings"] as JsonArray)?
                 .OfType<JsonObject>()
                 .Where(f => string.Equals(f["severity"]?.GetValue<string>(), "error", StringComparison.Ordinal))
@@ -1366,6 +1441,38 @@ namespace BreachScenarioEngine.Mcp.Editor
                 .ToList() ?? new List<string>();
 
             return errorCodes.Count > 0 && errorCodes.All(code => RetryableVerificationCodes.Contains(code));
+        }
+
+        private static string VerificationFailureCode(JsonObject summaryNode)
+        {
+            var code = summaryNode["failureCode"]?.GetValue<string>() ?? "";
+            if (!string.IsNullOrWhiteSpace(code))
+            {
+                return code;
+            }
+
+            return FirstErrorCode(summaryNode);
+        }
+
+        private static (string RetryClass, string FailureCode, int RetryableFailureCount, int BlockingFailureCount) ClassifyVerificationFindings(IEnumerable<JsonObject> findings)
+        {
+            var errorFindings = findings
+                .Where(f => string.Equals(f["severity"]?.GetValue<string>(), "error", StringComparison.Ordinal))
+                .ToList();
+            if (errorFindings.Count == 0)
+            {
+                return ("PASS", "", 0, 0);
+            }
+
+            var retryableFailureCount = errorFindings.Count(f =>
+            {
+                var code = f["code"]?.GetValue<string>() ?? "";
+                return !string.IsNullOrWhiteSpace(code) && RetryableVerificationCodes.Contains(code);
+            });
+            var blockingFailureCount = errorFindings.Count - retryableFailureCount;
+            var retryClass = blockingFailureCount == 0 ? "RETRYABLE_FAIL" : "BLOCKED";
+            var failureCode = errorFindings.FirstOrDefault()?["code"]?.GetValue<string>() ?? "";
+            return (retryClass, failureCode, retryableFailureCount, blockingFailureCount);
         }
 
         private static int AcceptedGenerationSeed(MissionTemplateModel template, IReadOnlyList<int> retrySeeds, JsonObject summaryNode)
@@ -1537,7 +1644,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             }
         }
 
-        private static string MissionResultJson(string status, string missionId, IEnumerable<string> artifacts, IEnumerable<JsonObject> findings)
+        private static string MissionResultJson(string status, string missionId, IEnumerable<string> artifacts, IEnumerable<JsonObject> findings, JsonObject? metrics = null, JsonObject? state = null)
         {
             return new JsonObject
             {
@@ -1545,7 +1652,13 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["missionId"] = missionId,
                 ["pipelineVersion"] = PipelineVersion,
                 ["artifacts"] = new JsonArray(artifacts.Select(a => (JsonNode?)a).ToArray()),
-                ["findings"] = FindingsArray(findings)
+                ["findings"] = FindingsArray(findings),
+                ["metrics"] = metrics != null ? (JsonObject)metrics.DeepClone() : new JsonObject(),
+                ["state"] = state != null ? (JsonObject)state.DeepClone() : new JsonObject
+                {
+                    ["currentStep"] = "",
+                    ["jobId"] = ""
+                }
             }.ToJsonString();
         }
 
@@ -1589,6 +1702,10 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["verification"] = new JsonObject
                 {
                     ["status"] = summaryNode["status"]?.GetValue<string>() ?? "PASS",
+                    ["retryClass"] = summaryNode["retryClass"]?.GetValue<string>() ?? "PASS",
+                    ["failureCode"] = summaryNode["failureCode"]?.GetValue<string>() ?? "",
+                    ["retryableFailureCount"] = summaryNode["retryableFailureCount"]?.GetValue<int>() ?? 0,
+                    ["blockingFailureCount"] = summaryNode["blockingFailureCount"]?.GetValue<int>() ?? 0,
                     ["findings"] = (summaryNode["findings"] as JsonArray)?.DeepClone() ?? new JsonArray(),
                     ["metrics"] = (summaryNode["metrics"] as JsonObject)?.DeepClone() ?? EmptyVerificationMetrics()
                 }
@@ -1608,6 +1725,61 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["missionState"] = unique.FirstOrDefault(p => p.EndsWith("mission_state.json", StringComparison.Ordinal)) ?? ""
             };
             return result;
+        }
+
+        private static HashSet<string> UndirectedEdgePairs(JsonArray? edges)
+        {
+            var pairs = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var edge in edges?.OfType<JsonObject>() ?? Enumerable.Empty<JsonObject>())
+            {
+                var from = edge["fromRoomId"]?.GetValue<string>() ?? "";
+                var to = edge["toRoomId"]?.GetValue<string>() ?? "";
+                if (string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(to))
+                {
+                    continue;
+                }
+
+                pairs.Add(RoomPairKey(from, to));
+            }
+
+            return pairs;
+        }
+
+        private static Dictionary<string, int> RoomDegrees(IReadOnlyList<JsonObject> rooms, HashSet<string> edgePairs)
+        {
+            var degrees = rooms
+                .Select(room => room["id"]?.GetValue<string>() ?? "")
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal)
+                .ToDictionary(id => id, _ => 0, StringComparer.Ordinal);
+
+            foreach (var pair in edgePairs)
+            {
+                var separatorIndex = pair.IndexOf('|');
+                if (separatorIndex <= 0 || separatorIndex >= pair.Length - 1)
+                {
+                    continue;
+                }
+
+                var left = pair.Substring(0, separatorIndex);
+                var right = pair.Substring(separatorIndex + 1);
+                if (degrees.ContainsKey(left))
+                {
+                    degrees[left]++;
+                }
+
+                if (degrees.ContainsKey(right))
+                {
+                    degrees[right]++;
+                }
+            }
+
+            return degrees;
+        }
+
+        private static string RoomPairKey(string a, string b)
+        {
+            return string.CompareOrdinal(a, b) <= 0 ? $"{a}|{b}" : $"{b}|{a}";
         }
 
         private static int ExistingAcceptedEffectiveSeed(JsonObject? existingManifest)

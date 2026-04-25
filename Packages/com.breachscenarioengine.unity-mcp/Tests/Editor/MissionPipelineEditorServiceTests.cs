@@ -322,13 +322,24 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.True(File.Exists(summaryPath));
             using var resultDoc = JsonDocument.Parse(message);
             Assert.AreEqual("PASS", resultDoc.RootElement.GetProperty("status").GetString());
+            Assert.AreEqual(1, resultDoc.RootElement.GetProperty("metrics").GetProperty("reachableObjectives").GetInt32());
+            Assert.AreEqual("verify", resultDoc.RootElement.GetProperty("state").GetProperty("currentStep").GetString());
             using var summaryDoc = JsonDocument.Parse(File.ReadAllText(summaryPath));
             var summary = summaryDoc.RootElement;
             Assert.AreEqual("bse.verification_summary.v2.3", summary.GetProperty("schemaVersion").GetString());
             Assert.AreEqual("PASS", summary.GetProperty("status").GetString());
+            Assert.AreEqual("PASS", summary.GetProperty("retryClass").GetString());
+            Assert.AreEqual("", summary.GetProperty("failureCode").GetString());
             Assert.AreEqual(2, summary.GetProperty("metrics").GetProperty("actorCount").GetInt32());
             Assert.AreEqual(1, summary.GetProperty("metrics").GetProperty("objectiveCount").GetInt32());
             Assert.AreEqual(0, summary.GetProperty("metrics").GetProperty("unreachableCriticalNodes").GetInt32());
+            Assert.AreEqual(1, summary.GetProperty("metrics").GetProperty("reachableObjectives").GetInt32());
+            Assert.AreEqual(0, summary.GetProperty("metrics").GetProperty("unreachableObjectives").GetInt32());
+            Assert.AreEqual(1, summary.GetProperty("metrics").GetProperty("alternateRoutes").GetInt32());
+            Assert.AreEqual(100.0, summary.GetProperty("metrics").GetProperty("hearingOverlapPercentage").GetDouble());
+            Assert.AreEqual(0.0, summary.GetProperty("metrics").GetProperty("chokepointPressure").GetDouble());
+            Assert.AreEqual(1.0, summary.GetProperty("metrics").GetProperty("averageCoverPerRoom").GetDouble());
+            Assert.AreEqual(1.0, summary.GetProperty("metrics").GetProperty("objectiveRoomPressure").GetDouble());
         }
 
         [Test]
@@ -363,6 +374,10 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.AreEqual("FAIL", doc.RootElement.GetProperty("status").GetString());
             var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
             Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "PROFILE_REF_MISSING"));
+            using var summaryDoc = JsonDocument.Parse(File.ReadAllText(summaryPath));
+            Assert.AreEqual("BLOCKED", summaryDoc.RootElement.GetProperty("retryClass").GetString());
+            using var stateDoc = JsonDocument.Parse(File.ReadAllText(Path.Combine(_testRoot, "mission_state.json")));
+            Assert.AreEqual("BLOCKED", stateDoc.RootElement.GetProperty("status").GetString());
         }
 
         [Test]
@@ -393,6 +408,11 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             using var doc = JsonDocument.Parse(message);
             var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
             Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "NAV_OBJECTIVE_UNREACHABLE"));
+            using var summaryDoc = JsonDocument.Parse(File.ReadAllText(summaryPath));
+            Assert.AreEqual("RETRYABLE_FAIL", summaryDoc.RootElement.GetProperty("retryClass").GetString());
+            Assert.AreEqual("NAV_OBJECTIVE_UNREACHABLE", summaryDoc.RootElement.GetProperty("failureCode").GetString());
+            using var stateDoc = JsonDocument.Parse(File.ReadAllText(Path.Combine(_testRoot, "mission_state.json")));
+            Assert.AreEqual("FAILED", stateDoc.RootElement.GetProperty("status").GetString());
         }
 
         [Test]
@@ -424,6 +444,7 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.AreEqual(42, manifest.GetProperty("effectiveSeed").GetInt32());
             Assert.AreEqual("manage_mission", manifest.GetProperty("lockOwner").GetString());
             Assert.AreEqual("PASS", manifest.GetProperty("verification").GetProperty("status").GetString());
+            Assert.AreEqual("PASS", manifest.GetProperty("verification").GetProperty("retryClass").GetString());
             Assert.AreEqual(ToRepoPath(payloadPath), manifest.GetProperty("artifacts").GetProperty("payload").GetString());
             Assert.AreEqual(ToRepoPath(summaryPath), manifest.GetProperty("artifacts").GetProperty("verificationSummary").GetString());
 
