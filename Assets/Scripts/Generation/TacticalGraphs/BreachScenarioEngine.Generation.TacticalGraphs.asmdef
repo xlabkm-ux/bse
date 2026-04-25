@@ -1,12 +1,8 @@
-﻿{
-  "name": "BreachScenarioEngine.Mcp.Editor",
+{
+  "name": "BreachScenarioEngine.Generation.TacticalGraphs",
   "rootNamespace": "BreachScenarioEngine.Mcp.Editor",
-  "references": [
-    "BreachScenarioEngine.Generation.TacticalGraphs"
-  ],
-  "includePlatforms": [
-    "Editor"
-  ],
+  "references": [],
+  "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
   "overrideReferences": true,
@@ -20,5 +16,5 @@
   "autoReferenced": true,
   "defineConstraints": [],
   "versionDefines": [],
-  "noEngineReferences": false
+  "noEngineReferences": true
 }

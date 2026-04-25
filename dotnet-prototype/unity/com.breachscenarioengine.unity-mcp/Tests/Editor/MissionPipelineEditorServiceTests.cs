@@ -231,6 +231,9 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
         [Test]
         public void TacticalGraphBuilder_BuildsDeterministicGraphsAndMetrics()
         {
+            var tacticalGraphAssembly = typeof(TacticalGraphBuilder).Assembly.GetName().Name;
+            Assert.AreEqual("BreachScenarioEngine.Generation.TacticalGraphs", tacticalGraphAssembly);
+
             var rooms = new List<JsonObject>
             {
                 Room("room_entry", "layout_test", "entry", 0, 0, 8, 8),

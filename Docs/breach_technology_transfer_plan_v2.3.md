@@ -106,6 +106,10 @@ Implementation note:
   without introducing a new runtime assembly dependency. Later transfer work
   may move the pure generator into `Assets/Scripts/Generation/Layout/` once the
   assembly boundary is chosen.
+- Transfer Session 7 started the tactical graph runtime transfer by adding
+  `Assets/Scripts/Generation/TacticalGraphs/` and a standalone runtime asmdef.
+  The package still uses its compatibility facade until the assembly boundary
+  is fully wired.
 
 Inputs:
 

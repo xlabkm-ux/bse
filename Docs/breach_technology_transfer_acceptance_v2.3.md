@@ -89,6 +89,17 @@ Transfer Session 2 implementation record:
 - Unity batchmode EditMode test validation is pending because the project was
   already open in another Unity instance during the implementation session
 
+Transfer Session 7 implementation record:
+
+- runtime tactical graph builders now live under
+  `Assets/Scripts/Generation/TacticalGraphs/`
+- a standalone `BreachScenarioEngine.Generation.TacticalGraphs` asmdef compiles
+  the new runtime layer independently
+- `TacticalGraphBuilder` remains as the package-side compatibility facade for
+  verification metrics and legacy tests
+- the package-side layout path still uses the compatibility facade while the
+  assembly boundary is being wired
+
 ## 4. Placement Acceptance
 
 The migrated placement layer is accepted when:

@@ -359,6 +359,57 @@ Handoff note:
   runtime preview. The transfer track is complete for the current v2.3
   content-layer session."
 
+### Transfer Session 7: Tactical Graph Runtime Transfer
+
+Status:
+
+- in_progress
+
+Goal:
+
+- move tactical graph builders out of the editor package and into repo-owned
+  runtime generation files while keeping verification metrics stable
+
+Work:
+
+- add dedicated tactical graph builders under
+  `Assets/Scripts/Generation/TacticalGraphs/`
+- keep the editor package as a consumer of the runtime tactical graph layer
+- preserve deterministic cover, visibility, hearing, and verification metric
+  output
+
+Completed:
+
+- added repo-owned runtime builders for cover, visibility, and hearing graphs
+- added a runtime `BreachScenarioEngine.Generation.TacticalGraphs` asmdef so
+  the new layer compiles independently
+- kept `TacticalGraphBuilder` in the editor package as the compatibility facade
+  for verification metrics and legacy call sites
+- restored the package-side layout generator to the stable compile path while
+  the runtime boundary is being wired
+
+Verification:
+
+- Unity batchmode compiles the new runtime tactical graph assembly and the
+  package assemblies successfully after the `IsExternalInit` compatibility stub
+  was added
+- the active tactical graph tests still exercise deterministic graph and
+  metric output through the compatibility facade
+
+Exit criteria:
+
+- tactical graph generation code lives in repo-owned runtime files and is
+  consumed by the package assembly
+- deterministic graph and metric output remains stable for the same inputs
+- the editor package no longer owns the tactical graph implementation copy
+
+Handoff note:
+
+- "Tactical graph generation has been transferred into repo-owned runtime
+  files and is compiling cleanly. Wire the package to the runtime layer next,
+  then continue with the next phase of the transfer plan by expanding or
+  hardening the verification and content-facing runtime modules."
+
 ## Active Continuation: v2.3 Stabilization
 
 The v2.2 mission pipeline sessions below are functionally complete. New chats
