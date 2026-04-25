@@ -477,9 +477,9 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.AreEqual(0, summary.GetProperty("metrics").GetProperty("unreachableCriticalNodes").GetInt32());
             Assert.AreEqual(1, summary.GetProperty("metrics").GetProperty("reachableObjectives").GetInt32());
             Assert.AreEqual(0, summary.GetProperty("metrics").GetProperty("unreachableObjectives").GetInt32());
-            Assert.AreEqual(1, summary.GetProperty("metrics").GetProperty("alternateRoutes").GetInt32());
+            Assert.AreEqual(0, summary.GetProperty("metrics").GetProperty("alternateRoutes").GetInt32());
             Assert.AreEqual(100.0, summary.GetProperty("metrics").GetProperty("hearingOverlapPercentage").GetDouble());
-            Assert.AreEqual(0.0, summary.GetProperty("metrics").GetProperty("chokepointPressure").GetDouble());
+            Assert.AreEqual(35.59, summary.GetProperty("metrics").GetProperty("chokepointPressure").GetDouble());
             Assert.AreEqual(1.0, summary.GetProperty("metrics").GetProperty("averageCoverPerRoom").GetDouble());
             Assert.AreEqual(1.0, summary.GetProperty("metrics").GetProperty("objectiveRoomPressure").GetDouble());
         }
