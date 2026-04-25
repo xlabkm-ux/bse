@@ -184,7 +184,7 @@ Handoff note:
 
 Status:
 
-- in_progress
+- completed
 
 Goal:
 
@@ -197,10 +197,26 @@ Work:
 - emit verification-friendly metrics for cover density, alternate routes,
   hearing overlap, chokepoint pressure, and objective room pressure
 
+Completed:
+
+- kept tactical graph generation isolated in `TacticalGraphBuilder`
+- removed obsolete cover, visibility, and hearing helper implementations from
+  `MissionPipelineEditorService` in both the embedded package and the source
+  copy
+- preserved deterministic tactical metrics in verification summaries for
+  cover density, alternate routes, hearing overlap, chokepoint pressure, and
+  objective room pressure
+
 Exit criteria:
 
 - tactical graph output remains deterministic
 - verification summary includes the expanded metric families
+
+Handoff note:
+
+- "Tactical graphs and verification metrics are now isolated in the dedicated
+  builder layer. Continue Transfer Session 4 by binding actor, hostage,
+  objective, and enemy placement to the active `layoutRevisionId`."
 
 ### Transfer Session 4: Layout-Bound Placement
 
