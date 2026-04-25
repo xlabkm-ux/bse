@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace BreachScenarioEngine.Runtime
@@ -7,10 +8,12 @@ namespace BreachScenarioEngine.Runtime
     {
         [SerializeField] private string profileId = "";
         [SerializeField] private string profileType = "";
-        [SerializeField] private string schemaVersion = "bse.profile.v2.2";
+        [SerializeField] private string schemaVersion = "bse.profile.v2.3";
+        [SerializeField] private List<string> addressableLabels = new();
 
         public string ProfileId => profileId;
         public string ProfileType => profileType;
         public string SchemaVersion => schemaVersion;
+        public IReadOnlyList<string> AddressableLabels => addressableLabels;
     }
 }

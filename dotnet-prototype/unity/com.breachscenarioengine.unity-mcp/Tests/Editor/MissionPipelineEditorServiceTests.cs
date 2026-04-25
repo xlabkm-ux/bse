@@ -212,6 +212,7 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.AreEqual(2, root.GetProperty("roster")[0].GetProperty("count").GetInt32());
             Assert.True(root.GetProperty("objectives").GetProperty("primary")[0].GetProperty("requiresLayoutGraph").GetBoolean());
             Assert.True(root.TryGetProperty("profileRefs", out _));
+            Assert.True(root.TryGetProperty("catalogRefs", out _));
         }
 
         [Test]
@@ -742,6 +743,53 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             }
         }
 
+        [Test]
+        public void MissionContentLayer_UsesV23ProfileAndCatalogAssets()
+        {
+            var profilesRoot = Path.Combine(_projectRoot, "Assets", "Data", "Mission", "Profiles");
+            var catalogsRoot = Path.Combine(_projectRoot, "Assets", "Data", "Mission", "Catalogs");
+
+            var profileFiles = new[]
+            {
+                "TacticalThemeProfile.asset",
+                "PerformanceProfile.asset",
+                "RenderProfile.asset",
+                "NavigationPolicy.asset",
+                "TacticalDensityProfile.asset",
+                "AddressablesCatalogProfile.asset"
+            };
+
+            foreach (var file in profileFiles)
+            {
+                var path = Path.Combine(profilesRoot, file);
+                Assert.True(File.Exists(path), $"Missing profile asset: {file}");
+                var text = File.ReadAllText(path);
+                Assert.True(text.Contains("schemaVersion: bse.profile.v2.3"), $"{file} must use bse.profile.v2.3");
+            }
+
+            var addressablesProfile = File.ReadAllText(Path.Combine(profilesRoot, "AddressablesCatalogProfile.asset"));
+            Assert.True(addressablesProfile.Contains("addressableLabels:"));
+            Assert.True(addressablesProfile.Contains("- biome"));
+            Assert.True(addressablesProfile.Contains("- actor"));
+            Assert.True(addressablesProfile.Contains("- objective"));
+            Assert.True(addressablesProfile.Contains("- cover"));
+
+            var catalogFiles = new[]
+            {
+                "EnemyCatalog.asset",
+                "EnvironmentCatalog.asset",
+                "ObjectiveCatalog.asset"
+            };
+
+            foreach (var file in catalogFiles)
+            {
+                var path = Path.Combine(catalogsRoot, file);
+                Assert.True(File.Exists(path), $"Missing catalog asset: {file}");
+                var text = File.ReadAllText(path);
+                Assert.True(text.Contains("schemaVersion: bse.catalog.v2.3"), $"{file} must use bse.catalog.v2.3");
+            }
+        }
+
         private static string RawArgs(string templatePath, string payloadPath = null, string layoutPath = null, string entitiesPath = null, string verificationPath = null, string manifestPath = null)
         {
             var template = ToRepoPath(templatePath);
@@ -785,23 +833,53 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Directory.CreateDirectory(profileRoot);
             var refs = new[]
             {
-                ("tacticalThemeProfile", "TacticalThemeProfile.asset"),
-                ("performanceProfile", "PerformanceProfile.asset"),
-                ("renderProfile", "RenderProfile.asset"),
-                ("navigationPolicy", "NavigationPolicy.asset"),
-                ("tacticalDensityProfile", "TacticalDensityProfile.asset"),
-                ("addressablesCatalogProfile", "AddressablesCatalogProfile.asset")
+                ("tacticalThemeProfile", "TacticalThemeProfile.asset", "TacticalThemeProfile", false),
+                ("performanceProfile", "PerformanceProfile.asset", "PerformanceProfile", false),
+                ("renderProfile", "RenderProfile.asset", "RenderProfile", false),
+                ("navigationPolicy", "NavigationPolicy.asset", "NavigationPolicy", false),
+                ("tacticalDensityProfile", "TacticalDensityProfile.asset", "TacticalDensityProfile", false),
+                ("addressablesCatalogProfile", "AddressablesCatalogProfile.asset", "AddressablesCatalogProfile", true)
             };
 
             using var payloadDoc = JsonDocument.Parse(File.ReadAllText(payloadPath));
             var payload = JsonNode.Parse(payloadDoc.RootElement.GetRawText()).AsObject();
             var profileRefs = payload["profileRefs"].AsObject();
-            foreach (var (key, name) in refs)
+            foreach (var (key, name, profileType, isAddressablesProfile) in refs)
             {
                 var path = Path.Combine(profileRoot, name);
-                if (!File.Exists(path))
+                if (!File.Exists(path) || new FileInfo(path).Length < 32)
                 {
-                    File.WriteAllText(path, "%YAML 1.1\n");
+                    var lines = new List<string>
+                    {
+                        "%YAML 1.1",
+                        "%TAG !u! tag:unity3d.com,2011:",
+                        "--- !u!114 &11400000",
+                        "MonoBehaviour:",
+                        "  m_ObjectHideFlags: 0",
+                        "  m_CorrespondingSourceObject: {fileID: 0}",
+                        "  m_PrefabInstance: {fileID: 0}",
+                        "  m_PrefabAsset: {fileID: 0}",
+                        "  m_GameObject: {fileID: 0}",
+                        "  m_Enabled: 1",
+                        "  m_EditorHideFlags: 0",
+                        "  m_Script: {fileID: 11500000, guid: ede104ae6d0542ac84f4ff44bf78f4fb, type: 3}",
+                        $"  m_Name: {name.Replace(".asset", "")}",
+                        "  m_EditorClassIdentifier: ",
+                        $"  profileId: {key}",
+                        $"  profileType: {profileType}",
+                        "  schemaVersion: bse.profile.v2.3"
+                    };
+
+                    if (isAddressablesProfile)
+                    {
+                        lines.Add("  addressableLabels:");
+                        lines.Add("  - biome");
+                        lines.Add("  - actor");
+                        lines.Add("  - objective");
+                        lines.Add("  - cover");
+                    }
+
+                    File.WriteAllText(path, string.Join(Environment.NewLine, lines) + Environment.NewLine);
                 }
 
                 profileRefs[key] = ToRepoPath(path);

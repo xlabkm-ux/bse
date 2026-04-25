@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   profileId: android2d_phase1_budget
   profileType: PerformanceProfile
-  schemaVersion: bse.profile.v2.2
+  schemaVersion: bse.profile.v2.3

@@ -7,7 +7,7 @@ namespace BreachScenarioEngine.Runtime
     {
         [SerializeField] private string missionId = "";
         [SerializeField] private string missionTitle = "";
-        [SerializeField] private string schemaVersion = "tb.mission_template.v2.2";
+        [SerializeField] private string schemaVersion = "tb.mission_template.v2.3";
         [SerializeField] private int initialSeed;
         [SerializeField] private int maxRetries;
         [SerializeField] private string templatePath = "";

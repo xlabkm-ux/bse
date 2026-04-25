@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   missionId: VS01_HostageApartment
   missionTitle: Hostage Apartment
-  schemaVersion: tb.mission_template.v2.2
+  schemaVersion: tb.mission_template.v2.3
   initialSeed: 428193
   maxRetries: 5
   templatePath: UserMissionSources/missions/VS01_HostageApartment/mission_design.template.yaml

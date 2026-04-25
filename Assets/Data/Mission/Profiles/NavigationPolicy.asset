@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   profileId: custom_grid_astar_2d
   profileType: NavigationPolicy
-  schemaVersion: bse.profile.v2.2
+  schemaVersion: bse.profile.v2.3

@@ -43,7 +43,6 @@ Not present yet:
 
 - `Assets/TacticalBreach/Profiles/`
 - `Assets/TacticalBreach/Catalogs/`
-- typed catalog assets under `Assets/Data/Mission/Catalogs/`
 
 ## Active Documentation
 
@@ -171,13 +170,12 @@ Direct dependencies in `Packages/manifest.json`:
 - `com.unity.inputsystem` `1.19.0`
 - `com.unity.multiplayer.center` `1.0.1`
 - `com.unity.render-pipelines.universal` `17.4.0`
-- `com.unity.test-framework` `1.5.1`
+- `com.unity.test-framework` `1.6.0`
 - selected Unity modules, including Physics 2D, UIElements, and Vector Graphics
 
 Resolved dependencies in `Packages/packages-lock.json` include Burst and
 Collections transitively through Entities and URP. Addressables, Jobs, and
-Unity AI Assistant are not direct dependencies and were not found in the lock
-file during this audit.
+Unity AI Assistant remain out of the direct package promise for now.
 
 URP 2D appears configured:
 
@@ -187,12 +185,15 @@ URP 2D appears configured:
 - `ProjectSettings/QualitySettings.asset` assigns the pipeline on the active
   quality level
 
-Potential drift:
+Resolved alignment:
 
-- The embedded package `package.json` declares `"unity": "2021.3"` while the
-  project runs on Unity `6000.4.3f1`.
-- `Packages/manifest.json` requests `com.unity.test-framework` `1.5.1`, while
-  `Packages/packages-lock.json` resolves `1.6.0`.
+- The embedded package `package.json` now targets Unity `6000.4.3f1`, matching
+  the project editor version.
+- `Packages/manifest.json` and `Packages/packages-lock.json` now align on
+  `com.unity.test-framework` `1.6.0`.
+- `com.unity.addressables` was evaluated for direct inclusion, but the direct
+  dependency was deferred because the imported package does not currently
+  compile cleanly under this editor target.
 
 ## Profiles And Catalogs
 
@@ -203,6 +204,14 @@ Implemented:
   Addressables Catalog.
 - `Assets/Scripts/Runtime/MissionProfileAsset.cs` provides a generic
   ScriptableObject profile shell.
+- `Assets/Data/Mission/Catalogs/` contains repo-owned catalog assets for
+  enemies, environments, and objectives.
+- `Assets/Scripts/Runtime/MissionCatalogAsset.cs` provides a catalog asset
+  shell for the new content layer.
+- `dotnet-prototype/unity/com.breachscenarioengine.unity-mcp/Editor/MissionPipelineEditorService.cs`
+  now validates `profileRefs` and `catalogRefs` against the repo-owned content
+  assets, including schema versions, content type fields, and Addressables
+  labels for the Addressables catalog profile.
 - `Assets/Data/Mission/MissionConfig/MissionConfig_VS01.asset` points to the
   VS01 template and generated artifact paths.
 
@@ -210,11 +219,9 @@ Not implemented:
 
 - typed profile classes such as `TacticalThemeProfile`,
   `EnemyProfile`, `ObjectiveProfile`, and `EnvironmentBiomeProfile`
-- typed catalogs such as `EnemyCatalog`, `EnvironmentCatalog`, and
-  `ObjectiveCatalog`
-- Addressables labels for biome, actor, objective, and cover categories
-- validation of Addressables keys or profile version compatibility beyond
-  checking that profile reference paths exist
+- typed catalog subclasses such as `EnemyCatalog`,
+  `EnvironmentCatalog`, and `ObjectiveCatalog`
+- type-safe editor accessors for the catalog and profile assets
 
 Path decision needed:
 

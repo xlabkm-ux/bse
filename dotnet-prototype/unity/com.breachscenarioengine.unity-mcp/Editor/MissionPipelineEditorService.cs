@@ -477,7 +477,8 @@ namespace BreachScenarioEngine.Mcp.Editor
 
                 payloadNode ??= new JsonObject
                 {
-                    ["profileRefs"] = template.ProfileRefs()
+                    ["profileRefs"] = template.ProfileRefs(),
+                    ["catalogRefs"] = template.CatalogRefs()
                 };
                 Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
 
@@ -587,7 +588,7 @@ namespace BreachScenarioEngine.Mcp.Editor
 
         private static JsonObject BuildPayloadNode(MissionTemplateModel template)
         {
-            return new JsonObject
+            var payload = new JsonObject
             {
                 ["header"] = new JsonObject
                 {
@@ -639,6 +640,10 @@ namespace BreachScenarioEngine.Mcp.Editor
                 },
                 ["profileRefs"] = template.ProfileRefs()
             };
+
+            payload["catalogRefs"] = template.CatalogRefs();
+
+            return payload;
         }
 
         private static JsonNode? ObjectiveNode(MissionObjective objective)
@@ -1213,37 +1218,149 @@ namespace BreachScenarioEngine.Mcp.Editor
 
         private static void ValidateProfileRefs(JsonObject payloadNode, List<JsonObject> findings)
         {
-            if (payloadNode["profileRefs"] is not JsonObject profileRefs)
+            ValidateContentRefs(
+                payloadNode,
+                "profileRefs",
+                "PROFILE_REFS_MISSING",
+                "PROFILE_REF_MISSING",
+                "bse.profile.v2.3",
+                "profileType",
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["tacticalThemeProfile"] = "TacticalThemeProfile",
+                    ["performanceProfile"] = "PerformanceProfile",
+                    ["renderProfile"] = "RenderProfile",
+                    ["navigationPolicy"] = "NavigationPolicy",
+                    ["tacticalDensityProfile"] = "TacticalDensityProfile",
+                    ["addressablesCatalogProfile"] = "AddressablesCatalogProfile"
+                },
+                new Dictionary<string, string[]>(StringComparer.Ordinal)
+                {
+                    ["addressablesCatalogProfile"] = new[] { "biome", "actor", "objective", "cover" }
+                },
+                findings);
+
+            ValidateContentRefs(
+                payloadNode,
+                "catalogRefs",
+                "CATALOG_REFS_MISSING",
+                "CATALOG_REF_MISSING",
+                "bse.catalog.v2.3",
+                "catalogType",
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["enemyCatalog"] = "EnemyCatalog",
+                    ["environmentCatalog"] = "EnvironmentCatalog",
+                    ["objectiveCatalog"] = "ObjectiveCatalog"
+                },
+                null,
+                findings);
+        }
+
+        private static void ValidateContentRefs(
+            JsonObject payloadNode,
+            string sectionName,
+            string missingSectionCode,
+            string missingRefCode,
+            string expectedSchemaVersion,
+            string typeFieldName,
+            IDictionary<string, string> expectedTypes,
+            IDictionary<string, string[]>? requiredLabels,
+            List<JsonObject> findings)
+        {
+            if (payloadNode[sectionName] is not JsonObject refs)
             {
-                findings.Add(Finding("error", "PROFILE_REFS_MISSING", "Payload is missing profileRefs"));
+                findings.Add(Finding("error", missingSectionCode, $"Payload is missing {sectionName}"));
                 return;
             }
 
-            var required = new[]
+            foreach (var key in expectedTypes.Keys)
             {
-                "tacticalThemeProfile",
-                "performanceProfile",
-                "renderProfile",
-                "navigationPolicy",
-                "tacticalDensityProfile",
-                "addressablesCatalogProfile"
-            };
-
-            foreach (var key in required)
-            {
-                var assetPath = profileRefs[key]?.GetValue<string>() ?? "";
+                var assetPath = refs[key]?.GetValue<string>() ?? "";
                 if (string.IsNullOrWhiteSpace(assetPath))
                 {
-                    findings.Add(Finding("error", "PROFILE_REF_MISSING", $"Payload profileRefs.{key} is missing"));
+                    findings.Add(Finding("error", missingRefCode, $"Payload {sectionName}.{key} is missing"));
                     continue;
                 }
 
                 var absolutePath = ToAbsoluteProjectPath(assetPath);
                 if (!IsUnderProjectRoot(absolutePath) || (!File.Exists(absolutePath) && AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) == null))
                 {
-                    findings.Add(Finding("error", "PROFILE_REF_MISSING", $"Profile reference does not resolve: {assetPath}", assetPath));
+                    findings.Add(Finding("error", missingRefCode, $"Reference does not resolve: {assetPath}", assetPath));
+                    continue;
+                }
+
+                ValidateMissionContentAsset(
+                    absolutePath,
+                    assetPath,
+                    sectionName,
+                    key,
+                    expectedSchemaVersion,
+                    typeFieldName,
+                    expectedTypes[key],
+                    requiredLabels != null && requiredLabels.TryGetValue(key, out var labels) ? labels : Array.Empty<string>(),
+                    findings);
+            }
+        }
+
+        private static void ValidateMissionContentAsset(
+            string absolutePath,
+            string repoRelativePath,
+            string sectionName,
+            string key,
+            string expectedSchemaVersion,
+            string typeFieldName,
+            string expectedType,
+            IReadOnlyCollection<string> requiredLabels,
+            List<JsonObject> findings)
+        {
+            string content;
+            try
+            {
+                content = File.ReadAllText(absolutePath);
+            }
+            catch (Exception ex)
+            {
+                findings.Add(Finding("error", "PROFILE_REF_MISSING", $"Unable to read content asset: {repoRelativePath} ({ex.Message})", repoRelativePath));
+                return;
+            }
+
+            var schemaVersion = ReadUnityScalarField(content, "schemaVersion");
+            if (!string.Equals(schemaVersion, expectedSchemaVersion, StringComparison.Ordinal))
+            {
+                findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{sectionName}.{key} must use {expectedSchemaVersion}", repoRelativePath));
+            }
+
+            var contentType = ReadUnityScalarField(content, typeFieldName);
+            if (!string.Equals(contentType, expectedType, StringComparison.Ordinal))
+            {
+                findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{sectionName}.{key} must declare {typeFieldName}: {expectedType}", repoRelativePath));
+            }
+
+            foreach (var label in requiredLabels)
+            {
+                if (!content.Contains($"- {label}", StringComparison.Ordinal))
+                {
+                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{sectionName}.{key} is missing required Addressables label: {label}", repoRelativePath));
                 }
             }
+        }
+
+        private static string ReadUnityScalarField(string content, string fieldName)
+        {
+            foreach (var line in content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
+            {
+                var trimmed = line.Trim();
+                if (!trimmed.StartsWith(fieldName + ":", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var value = trimmed.Substring(fieldName.Length + 1).Trim();
+                return value.Trim('"');
+            }
+
+            return "";
         }
 
         private static int CountLight2DObjects()
@@ -2126,6 +2243,23 @@ namespace BreachScenarioEngine.Mcp.Editor
                 return result;
             }
 
+            public JsonObject CatalogRefs()
+            {
+                const string root = "Assets/Data/Mission/Catalogs";
+                var result = new JsonObject
+                {
+                    ["enemyCatalog"] = $"{root}/EnemyCatalog.asset",
+                    ["environmentCatalog"] = $"{root}/EnvironmentCatalog.asset",
+                    ["objectiveCatalog"] = $"{root}/ObjectiveCatalog.asset"
+                };
+                foreach (var kv in CatalogRefsMap)
+                {
+                    result[kv.Key] = kv.Value;
+                }
+
+                return result;
+            }
+
             public static bool TryLoad(string path, string? requestedMissionId, out MissionTemplateModel? template, out List<JsonObject> findings)
             {
                 template = new MissionTemplateModel();
@@ -2481,14 +2615,30 @@ namespace BreachScenarioEngine.Mcp.Editor
                     "navigationPolicy",
                     "tacticalDensityProfile",
                     "addressablesCatalogProfile"
-                }, "profileRefs", "TPL_PROFILE_REF_MISSING", findings);
+                }, "profileRefs", "TPL_PROFILE_REF_MISSING", "bse.profile.v2.3", "profileType", new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["tacticalThemeProfile"] = "TacticalThemeProfile",
+                    ["performanceProfile"] = "PerformanceProfile",
+                    ["renderProfile"] = "RenderProfile",
+                    ["navigationPolicy"] = "NavigationPolicy",
+                    ["tacticalDensityProfile"] = "TacticalDensityProfile",
+                    ["addressablesCatalogProfile"] = "AddressablesCatalogProfile"
+                }, new Dictionary<string, string[]>(StringComparer.Ordinal)
+                {
+                    ["addressablesCatalogProfile"] = new[] { "biome", "actor", "objective", "cover" }
+                }, findings);
 
                 ValidateReferenceSection(template.HasCatalogRefsSection, template.CatalogRefsMap, new[]
                 {
                     "enemyCatalog",
                     "environmentCatalog",
                     "objectiveCatalog"
-                }, "catalogRefs", "TPL_PROFILE_REF_MISSING", findings);
+                }, "catalogRefs", "TPL_PROFILE_REF_MISSING", "bse.catalog.v2.3", "catalogType", new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["enemyCatalog"] = "EnemyCatalog",
+                    ["environmentCatalog"] = "EnvironmentCatalog",
+                    ["objectiveCatalog"] = "ObjectiveCatalog"
+                }, null, findings);
 
                 ValidateActors(template.Actors, findings);
                 ValidateObjectives(template.PrimaryObjectives, "objectives.primary", findings);
@@ -2588,6 +2738,10 @@ namespace BreachScenarioEngine.Mcp.Editor
                 IReadOnlyCollection<string> requiredKeys,
                 string sectionName,
                 string missingCode,
+                string expectedSchemaVersion,
+                string typeFieldName,
+                IDictionary<string, string>? expectedTypes,
+                IDictionary<string, string[]>? requiredLabels,
                 List<JsonObject> findings)
             {
                 if (!sectionSeen)
@@ -2607,8 +2761,76 @@ namespace BreachScenarioEngine.Mcp.Editor
                     if (!IsUnderProjectRoot(absolutePath) || (!File.Exists(absolutePath) && AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) == null))
                     {
                         findings.Add(Finding("error", missingCode, $"{sectionName}.{key} does not resolve: {assetPath}", assetPath));
+                        continue;
+                    }
+
+                    ValidateContentAsset(absolutePath, findings, sectionName, key, assetPath, expectedSchemaVersion, typeFieldName, expectedTypes, requiredLabels);
+                }
+            }
+
+            private static void ValidateContentAsset(
+                string absolutePath,
+                List<JsonObject> findings,
+                string sectionName,
+                string key,
+                string repoRelativePath,
+                string expectedSchemaVersion,
+                string typeFieldName,
+                IDictionary<string, string>? expectedTypes,
+                IDictionary<string, string[]>? requiredLabels)
+            {
+                string content;
+                try
+                {
+                    content = File.ReadAllText(absolutePath);
+                }
+                catch (Exception ex)
+                {
+                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{sectionName}.{key} is unreadable: {ex.Message}", repoRelativePath));
+                    return;
+                }
+
+                var schemaVersion = ReadScalarField(content, "schemaVersion");
+                if (!string.Equals(schemaVersion, expectedSchemaVersion, StringComparison.Ordinal))
+                {
+                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{sectionName}.{key} must use {expectedSchemaVersion}", repoRelativePath));
+                }
+
+                if (expectedTypes != null && expectedTypes.TryGetValue(key, out var expectedType))
+                {
+                    var actualType = ReadScalarField(content, typeFieldName);
+                    if (!string.Equals(actualType, expectedType, StringComparison.Ordinal))
+                    {
+                        findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{sectionName}.{key} must declare {typeFieldName}: {expectedType}", repoRelativePath));
                     }
                 }
+
+                if (requiredLabels != null && requiredLabels.TryGetValue(key, out var labels))
+                {
+                    foreach (var label in labels)
+                    {
+                        if (!content.Contains($"- {label}", StringComparison.Ordinal))
+                        {
+                            findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{sectionName}.{key} is missing required Addressables label: {label}", repoRelativePath));
+                        }
+                    }
+                }
+            }
+
+            private static string ReadScalarField(string content, string fieldName)
+            {
+                foreach (var line in content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
+                {
+                    var trimmed = line.Trim();
+                    if (!trimmed.StartsWith(fieldName + ":", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    return trimmed.Substring(fieldName.Length + 1).Trim().Trim('"');
+                }
+
+                return "";
             }
 
             private static void ValidateObjectiveReferences(MissionTemplateModel template, List<JsonObject> findings)

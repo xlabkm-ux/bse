@@ -183,7 +183,7 @@ Completed:
 
 Status:
 
-- pending
+- completed
 
 Goal:
 
@@ -197,6 +197,23 @@ Work:
 - align embedded package metadata with Unity `6000.4.3f1`
 - add typed profiles and catalogs after the docs choose an authoritative path
 - validate Addressables labels and profile versions
+
+Completed:
+
+- aligned the embedded Unity package metadata with Unity `6000.4.3f1`
+- aligned `com.unity.test-framework` with the resolved `1.6.0` lockfile
+- normalized the canonical mission profile schema versions to v2.3
+- added repo-owned catalog assets under `Assets/Data/Mission/Catalogs/`
+- captured Addressables labels on the mission profile asset
+- made `compile_payload` and `verify` emit and validate `catalogRefs` against the
+  repo-owned catalog assets
+
+Exit criteria:
+
+- package metadata matches the Unity 6 target
+- the chosen profile/catalog root exists in repo-owned assets
+- profile versions and Addressables labels are represented in content assets
+- the session 6 continuation path is no longer blocked on root selection
 
 ## Current State
 

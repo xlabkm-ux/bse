@@ -14,4 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   profileId: phase1_local_catalog
   profileType: AddressablesCatalogProfile
-  schemaVersion: bse.profile.v2.2
+  schemaVersion: bse.profile.v2.3
+  addressableLabels:
+  - biome
+  - actor
+  - objective
+  - cover
