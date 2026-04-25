@@ -6,6 +6,13 @@ Unity target: `6000.4.3f1`
 Version: 2.3
 Status: Active documentation contract
 
+Target platforms:
+
+- Primary: Windows 10 / 11 desktop, 1920x1080+ resolution, 16:9 or wider
+- Secondary: Android mobile, 1080p portrait and landscape, touch controls, and
+  optional controller support
+- UI: scalable across supported desktop and mobile resolutions
+
 This document is the repo-owned source of truth for the v2.3 mission
 generation architecture. It supersedes the active v2.2 reading path while the
 v2.2 files remain available as historical references.
@@ -215,4 +222,3 @@ A generated mission is accepted only when:
 - All machine decisions are available in JSON artifacts or MCP envelopes.
 - Generated scene objects have stable generated ownership markers.
 - Payload, manifest, and verification artifacts use repository-relative paths.
-

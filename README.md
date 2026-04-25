@@ -2,6 +2,13 @@
 
 Initial project scaffold for **TACTICAL BREACH: Mission Architect / Breach Scenario Engine**.
 
+## Target Platforms
+
+- Primary: Windows 10 / 11 desktop, 1920x1080+ resolution, 16:9 or wider
+- Secondary: Android mobile, 1080p portrait and landscape, touch controls, and
+  optional controller support
+- UI: scalable across supported desktop and mobile resolutions
+
 ## Project Layout
 
 - `Assets/` - Unity runtime and editor content
@@ -30,6 +37,10 @@ Initial project scaffold for **TACTICAL BREACH: Mission Architect / Breach Scena
 - [Docs/mission_pipeline_contract_v2.3.md](Docs/mission_pipeline_contract_v2.3.md)
 - [Docs/mission_data_contract_v2.3.md](Docs/mission_data_contract_v2.3.md)
 - [Docs/generation_manifest_contract_v2.3.md](Docs/generation_manifest_contract_v2.3.md)
+- [Docs/breach_technology_transfer_plan_v2.3.md](Docs/breach_technology_transfer_plan_v2.3.md)
+- [Docs/migration_from_breach_scene_builders.md](Docs/migration_from_breach_scene_builders.md)
+- [Docs/scene_materialization_contract_v2.3.md](Docs/scene_materialization_contract_v2.3.md)
+- [Docs/breach_technology_transfer_acceptance_v2.3.md](Docs/breach_technology_transfer_acceptance_v2.3.md)
 
 ## Standards
 

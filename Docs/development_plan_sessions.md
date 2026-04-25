@@ -7,6 +7,211 @@ This document splits the mission pipeline work into handoff-friendly sessions.
 It is intended for switching between chats or resuming later without rebuilding
 the whole roadmap.
 
+## Active Continuation: BREACH Technology Transfer
+
+The v2.3 stabilization track is complete enough to serve as the target
+architecture. New chats should continue the BREACH technology transfer track
+unless the user asks for a different task.
+
+### Transfer Session 0: Documentation Baseline
+
+Status:
+
+- completed
+
+Goal:
+
+- define how proven technologies from `E:/Games/Breach/BREACH` move into BSE
+  without copying the legacy editor-monolith architecture
+
+Completed:
+
+- created `Docs/migration_from_breach_scene_builders.md`
+- created `Docs/breach_technology_transfer_plan_v2.3.md`
+- created `Docs/scene_materialization_contract_v2.3.md`
+- created `Docs/breach_technology_transfer_acceptance_v2.3.md`
+- linked the transfer docs from `README.md`, `Docs/README.md`,
+  `Docs/index.md`, and `Docs/project_documentation.md`
+- documented target platforms:
+  - Primary: Windows 10 / 11 desktop, 1920x1080+ resolution, 16:9 or wider
+  - Secondary: Android mobile, 1080p portrait and landscape, touch controls,
+    and optional controller support
+  - scalable UI across supported desktop and mobile resolutions
+
+Handoff note:
+
+- "The BREACH transfer docs are in place. Start with a source traceability
+  audit, then implement BSP as a pure Step 6 layout generator without Tilemap,
+  prefab, Resources, GameObject.Find, or NavMesh dependencies."
+
+### Transfer Session 1: Source Traceability Audit
+
+Status:
+
+- pending
+
+Goal:
+
+- freeze `BREACH` as a read-only reference and map each useful source behavior
+  to a BSE target module before implementation
+
+Work:
+
+- inspect and summarize:
+  - `E:/Games/Breach/BREACH/Assets/Scripts/Editor/Day1LevelGenerator.cs`
+  - `E:/Games/Breach/BREACH/Assets/Scripts/Mission/ApartmentLayoutBuilder.cs`
+  - `E:/Games/Breach/BREACH/Assets/Scripts/Editor/Day1SceneSetup.cs`
+  - `E:/Games/Breach/BREACH/Assets/Scripts/Editor/Day1Verification.cs`
+  - `E:/Games/Breach/BREACH/Assets/Scripts/Editor/MapTileAssetBootstrap.cs`
+  - `E:/Games/Breach/BREACH/Assets/Scripts/Editor/FullProjectBake.cs`
+  - `E:/Games/Breach/BREACH/MISSION_STANDARDS.md`
+- create or update a traceability section that records:
+  - source behavior
+  - BSE target file/module
+  - copied idea
+  - intentionally discarded legacy behavior
+  - verification method
+- identify existing BSE implementation points in:
+  - `dotnet-prototype/unity/com.breachscenarioengine.unity-mcp/Editor/MissionPipelineEditorService.cs`
+  - `Assets/Scripts/Generation/`
+  - `Assets/Scripts/Runtime/MissionRuntimeJsonModels.cs`
+  - `Assets/Scripts/Runtime/MissionSceneBuilder.cs`
+
+Exit criteria:
+
+- every planned transfer feature has source and target traceability
+- no BREACH code has been copied into BSE yet
+- first implementation slice is clearly scoped to pure Step 6 layout data
+
+### Transfer Session 2: Pure BSP Layout Generator
+
+Status:
+
+- pending
+
+Goal:
+
+- extract BSP room/portal/window/breach-point heuristics into BSE as a pure
+  Step 6 data generator
+
+Work:
+
+- add BSE layout generator types under `Assets/Scripts/Generation/Layout/`
+  or the currently active Unity MCP editor service layer, following existing
+  project patterns
+- consume `mission_payload.generated.json`, seed, BSP constraints, profiles,
+  and catalogs
+- write deterministic room, portal, window, breach point, and initial cover
+  candidate data into `mission_layout.generated.json`
+- preserve stable `layoutRevisionId` for identical inputs
+- keep Step 6 free of Tilemap, PrefabUtility, GameObject.Find, Resources, and
+  NavMesh calls
+
+Exit criteria:
+
+- `manage_mission(action="generate_layout")` produces deterministic BSP-based
+  layout data
+- repeated generation with the same payload and seed is stable
+- Step 5 remains blocked without a current layout
+
+### Transfer Session 3: Tactical Graphs and Cover Heuristics
+
+Status:
+
+- pending
+
+Goal:
+
+- turn BREACH cover/window/door heuristics into BSE tactical graph data
+
+Work:
+
+- add or expand cover, visibility, and hearing graph builders
+- keep cover away from doors, windows, breach points, and objective access
+- emit verification-friendly metrics for cover density, alternate routes,
+  hearing overlap, chokepoint pressure, and objective room pressure
+
+Exit criteria:
+
+- tactical graph output remains deterministic
+- verification summary includes the expanded metric families
+
+### Transfer Session 4: Layout-Bound Placement
+
+Status:
+
+- pending
+
+Goal:
+
+- keep actors, hostages, objectives, and enemies in Step 5 and bind all
+  placements to the active `layoutRevisionId`
+
+Work:
+
+- adapt placement to the new BSP room and portal data
+- prevent duplicate enemy placement from the legacy BREACH pattern
+- ensure entities include stable ownership metadata, `roomId`, `navNodeId`,
+  and `layoutRevisionId`
+
+Exit criteria:
+
+- placement fails on missing or stale layout
+- placement never runs inside Step 6
+- generated entity data is stable and verification-ready
+
+### Transfer Session 5: Scene Materializer
+
+Status:
+
+- pending
+
+Goal:
+
+- build Unity preview/playable scenes from generated artifacts as output, not
+  source of truth
+
+Work:
+
+- implement `MissionSceneContext`
+- implement materialization from `mission_layout.generated.json` and
+  `mission_entities.generated.json`
+- materialize Tilemaps, doors, windows, covers, enemies, objectives,
+  extraction zones, lighting, and debug roots
+- cleanup only generated-owned objects
+- preserve Windows 10/11 desktop and Android 1080p portrait/landscape
+  assumptions with scalable UI
+
+Exit criteria:
+
+- VS01 can be materialized from generated artifacts
+- scene cleanup does not affect user-owned objects
+- materialized scene follows `Docs/scene_materialization_contract_v2.3.md`
+
+### Transfer Session 6: Catalogs, Verification, and CI Preview
+
+Status:
+
+- pending
+
+Goal:
+
+- finish the transfer by moving content lookup to catalogs, expanding JSON
+  verification, and replacing full bake with manage_mission-driven CI preview
+
+Work:
+
+- move tile/prefab lookup to Mission Catalogs rather than `Resources`
+- port useful BREACH verification checks into JSON findings and metrics
+- add CI runner that executes the canonical mission pipeline and optional
+  scene preview materialization
+
+Exit criteria:
+
+- missing content is reported as JSON findings
+- `verification_summary.json` is the decision source
+- CI never writes an accepted manifest unless Step 7 PASS is proven
+
 ## Active Continuation: v2.3 Stabilization
 
 The v2.2 mission pipeline sessions below are functionally complete. New chats

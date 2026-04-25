@@ -7,6 +7,13 @@ This document is the map for the active documentation set. It intentionally
 tracks only the current Breach Scenario Engine mission pipeline. Imported Unity
 MCP backlog and generic bridge workflow notes are not part of the active docs.
 
+## Target Platforms
+
+- Primary: Windows 10 / 11 desktop, 1920x1080+ resolution, 16:9 or wider
+- Secondary: Android mobile, 1080p portrait and landscape, touch controls, and
+  optional controller support
+- UI: scalable across supported desktop and mobile resolutions
+
 ## 1. Active Documentation Set
 
 ### Entry points
@@ -55,6 +62,21 @@ MCP backlog and generic bridge workflow notes are not part of the active docs.
 - [Docs/generation_manifest_contract_v2.3.md](generation_manifest_contract_v2.3.md)
   - Accepted replay, seed, lifecycle, and manifest contract
 
+### BREACH technology migration
+
+- [Docs/migration_from_breach_scene_builders.md](migration_from_breach_scene_builders.md)
+  - Reference mapping from legacy BREACH scene builders to BSE v2.3 modules
+
+- [Docs/breach_technology_transfer_plan_v2.3.md](breach_technology_transfer_plan_v2.3.md)
+  - Phased plan for transferring BSP, tactical graphs, materialization,
+    verification, content catalogs, and CI preview workflow
+
+- [Docs/scene_materialization_contract_v2.3.md](scene_materialization_contract_v2.3.md)
+  - Contract for turning generated JSON artifacts into optional Unity scenes
+
+- [Docs/breach_technology_transfer_acceptance_v2.3.md](breach_technology_transfer_acceptance_v2.3.md)
+  - Acceptance gates, traceability requirements, and migration risks
+
 ### Planning and history
 
 - [Docs/development_plan_sessions.md](development_plan_sessions.md)
@@ -76,7 +98,11 @@ MCP backlog and generic bridge workflow notes are not part of the active docs.
 9. [Docs/mission_pipeline_contract_v2.3.md](mission_pipeline_contract_v2.3.md)
 10. [Docs/mission_data_contract_v2.3.md](mission_data_contract_v2.3.md)
 11. [Docs/generation_manifest_contract_v2.3.md](generation_manifest_contract_v2.3.md)
-12. [Docs/development_plan_sessions.md](development_plan_sessions.md)
+12. [Docs/migration_from_breach_scene_builders.md](migration_from_breach_scene_builders.md)
+13. [Docs/breach_technology_transfer_plan_v2.3.md](breach_technology_transfer_plan_v2.3.md)
+14. [Docs/scene_materialization_contract_v2.3.md](scene_materialization_contract_v2.3.md)
+15. [Docs/breach_technology_transfer_acceptance_v2.3.md](breach_technology_transfer_acceptance_v2.3.md)
+16. [Docs/development_plan_sessions.md](development_plan_sessions.md)
 
 ## 3. Runtime Snapshot
 

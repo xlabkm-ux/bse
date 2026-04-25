@@ -12,6 +12,10 @@ Short entry point for the active Breach Scenario Engine MCP documentation.
 | [mission_template_v2.3.md](mission_template_v2.3.md) | Canonical mission template specification |
 | [mission_data_contract_v2.3.md](mission_data_contract_v2.3.md) | JSON Schema contract for generated mission payloads |
 | [generation_manifest_contract_v2.3.md](generation_manifest_contract_v2.3.md) | Accepted replay, seed, lifecycle, and manifest contract |
+| [migration_from_breach_scene_builders.md](migration_from_breach_scene_builders.md) | Reference mapping for transferring proven BREACH scene-building technology |
+| [breach_technology_transfer_plan_v2.3.md](breach_technology_transfer_plan_v2.3.md) | Phased plan for moving BREACH technologies into the v2.3 pipeline |
+| [scene_materialization_contract_v2.3.md](scene_materialization_contract_v2.3.md) | Contract for building Unity scene previews from generated artifacts |
+| [breach_technology_transfer_acceptance_v2.3.md](breach_technology_transfer_acceptance_v2.3.md) | Acceptance gates and risk checklist for migrated BREACH technology |
 | [pilot_operation_checklist.md](pilot_operation_checklist.md) | Pilot operation acceptance checklist for VS01, VS02, and VS03 |
 | [development_plan_sessions.md](development_plan_sessions.md) | Session-split plan for handing the work across chats |
 | [canonical_tools.md](canonical_tools.md) | Current project MCP tool contract |
@@ -27,4 +31,5 @@ Short entry point for the active Breach Scenario Engine MCP documentation.
 5. Read [mission_authoring_contract_v2.3.md](mission_authoring_contract_v2.3.md) before editing mission YAML.
 6. Read [mission_pipeline_contract_v2.3.md](mission_pipeline_contract_v2.3.md) before implementing generation code.
 7. Read [mission_data_contract_v2.3.md](mission_data_contract_v2.3.md) and [generation_manifest_contract_v2.3.md](generation_manifest_contract_v2.3.md) for runtime artifacts.
-8. Track remaining work in [development_plan_sessions.md](development_plan_sessions.md).
+8. For BREACH technology migration, read [migration_from_breach_scene_builders.md](migration_from_breach_scene_builders.md), [breach_technology_transfer_plan_v2.3.md](breach_technology_transfer_plan_v2.3.md), [scene_materialization_contract_v2.3.md](scene_materialization_contract_v2.3.md), and [breach_technology_transfer_acceptance_v2.3.md](breach_technology_transfer_acceptance_v2.3.md).
+9. Track remaining work in [development_plan_sessions.md](development_plan_sessions.md).
