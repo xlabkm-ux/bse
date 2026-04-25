@@ -23,3 +23,6 @@ MonoBehaviour:
   entitiesPath: UserMissionSources/missions/VS02_DataRaidOffice/mission_entities.generated.json
   verificationSummaryPath: UserMissionSources/missions/VS02_DataRaidOffice/verification_summary.json
   generationManifestPath: UserMissionSources/missions/VS02_DataRaidOffice/generation_manifest.json
+  enemyCatalog: {fileID: 11400000, guid: 1b1b4c2bbf2d4a5b8bf0e0b5df9b3a21, type: 2}
+  environmentCatalog: {fileID: 11400000, guid: 7c8f2b9d2edc4f87b9025dff92b87e14, type: 2}
+  objectiveCatalog: {fileID: 11400000, guid: 9f4c0cf063bc4d97a1ec81f1d1fb6c62, type: 2}

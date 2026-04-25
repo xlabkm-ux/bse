@@ -184,6 +184,8 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.AreEqual(2, root.GetProperty("roster")[0].GetProperty("count").GetInt32());
             Assert.True(root.GetProperty("objectives").GetProperty("primary")[0].GetProperty("requiresLayoutGraph").GetBoolean());
             Assert.True(root.TryGetProperty("profileRefs", out _));
+            Assert.True(root.TryGetProperty("catalogRefs", out _));
+            Assert.AreEqual("Assets/Data/Mission/Catalogs/EnemyCatalog.asset", root.GetProperty("catalogRefs").GetProperty("enemyCatalog").GetString());
         }
 
         [Test]
@@ -589,6 +591,7 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.AreEqual("PASS", manifest.GetProperty("verification").GetProperty("retryClass").GetString());
             Assert.AreEqual(ToRepoPath(payloadPath), manifest.GetProperty("artifacts").GetProperty("payload").GetString());
             Assert.AreEqual(ToRepoPath(summaryPath), manifest.GetProperty("artifacts").GetProperty("verificationSummary").GetString());
+            Assert.AreEqual("Assets/Data/Mission/Catalogs/EnemyCatalog.asset", manifest.GetProperty("catalogRefs").GetProperty("enemyCatalog").GetString());
 
             using var payloadDoc = JsonDocument.Parse(File.ReadAllText(payloadPath));
             var header = payloadDoc.RootElement.GetProperty("header");

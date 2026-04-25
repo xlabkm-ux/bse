@@ -71,6 +71,9 @@ namespace BreachScenarioEngine.Editor.Tests
                     Assert.NotNull(context.HostagesRoot, "HostagesRoot");
                     Assert.NotNull(context.ExtractionRoot, "ExtractionRoot");
                     Assert.NotNull(context.DebugRoot, "DebugRoot");
+                    Assert.NotNull(config!.EnemyCatalog, "EnemyCatalog");
+                    Assert.NotNull(config.EnvironmentCatalog, "EnvironmentCatalog");
+                    Assert.NotNull(config.ObjectiveCatalog, "ObjectiveCatalog");
                     Assert.Greater(loader.CurrentRoot.GetComponentsInChildren<Tilemap>().Length, 0);
                     Assert.Greater(loader.CurrentRoot.GetComponentsInChildren<GeneratedOwnershipMarker>().Length, 0);
                     Assert.Greater(loader.CurrentRoot.GetComponentsInChildren<MissionCompleteTrigger>().Length, 0);

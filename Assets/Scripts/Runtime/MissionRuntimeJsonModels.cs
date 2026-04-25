@@ -12,6 +12,15 @@ namespace BreachScenarioEngine.Runtime
         public int requestedSeed;
         public int effectiveSeed;
         public string layoutRevisionId = "";
+        public MissionCatalogRefs catalogRefs = new();
+    }
+
+    [Serializable]
+    public sealed class MissionCatalogRefs
+    {
+        public string enemyCatalog = "";
+        public string environmentCatalog = "";
+        public string objectiveCatalog = "";
     }
 
     [Serializable]

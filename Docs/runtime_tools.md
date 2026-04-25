@@ -46,6 +46,8 @@ The inventory is target-only.
 - `manage_mission` is now part of the current runtime inventory for the mission pipeline. The current vertical slice supports `validate_template`, `compile_payload`, `generate_layout`, layout-gated `place_entities`, `verify`, `write_manifest`, and diagnostic `cleanup_generation_lock`.
 - `manage_mission` returns the shared mission JSON envelope in the tool result text, so callers should parse `status`, `missionId`, `pipelineVersion`, `artifacts`, and `findings` from the returned string.
 - `write_manifest` owns retry execution for retryable Step 7 failures: it returns to `generate_layout`, reruns placement and verification, records deterministic `retrySeeds`, and writes the manifest only after PASS.
+- Mission payload and manifest generation now include repo-relative `catalogRefs`, and verification checks those references before accepting Step 7 output.
+- `PilotMissionPipelineCi` can optionally materialize a runtime scene preview after the canonical pipeline when `BSE_CI_MATERIALIZE_SCENE_PREVIEW=1`.
 - Mission writes use the mission-scoped `.generation.lock`, lifecycle transitions are recorded in `mission_state.json`, and stale locks require explicit `cleanup_generation_lock`.
 - Mission pipeline regression coverage now includes direct Unity service tests, bridge route/capability checks, server dispatcher routing for every public mission action, and default artifact path creation.
 - Active project documentation now targets v2.3. The remaining runtime gaps

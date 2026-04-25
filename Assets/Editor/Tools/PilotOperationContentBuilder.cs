@@ -68,6 +68,9 @@ namespace BreachScenarioEngine.Editor.Tools
             serialized.FindProperty("entitiesPath").stringValue = missionRoot + "/mission_entities.generated.json";
             serialized.FindProperty("verificationSummaryPath").stringValue = missionRoot + "/verification_summary.json";
             serialized.FindProperty("generationManifestPath").stringValue = missionRoot + "/generation_manifest.json";
+            serialized.FindProperty("enemyCatalog").objectReferenceValue = AssetDatabase.LoadAssetAtPath<MissionCatalogAsset>("Assets/Data/Mission/Catalogs/EnemyCatalog.asset");
+            serialized.FindProperty("environmentCatalog").objectReferenceValue = AssetDatabase.LoadAssetAtPath<MissionCatalogAsset>("Assets/Data/Mission/Catalogs/EnvironmentCatalog.asset");
+            serialized.FindProperty("objectiveCatalog").objectReferenceValue = AssetDatabase.LoadAssetAtPath<MissionCatalogAsset>("Assets/Data/Mission/Catalogs/ObjectiveCatalog.asset");
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(config);
             return config;

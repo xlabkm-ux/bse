@@ -115,6 +115,14 @@ namespace BreachScenarioEngine.Mcp.Editor
                 return (false, MissionResultJson("FAIL", template.MissionId, new[] { ToRepoPath(context.TemplatePath!) }, findings));
             }
 
+            ValidateProfileRefs(payloadNode, findings);
+            ValidateCatalogRefs(payloadNode, findings);
+            if (findings.Any(f => f["severity"]?.GetValue<string>() == "error"))
+            {
+                WriteMissionState(missionDir, template.MissionId, "BLOCKED", "compile_payload", "", LastFindingCode(findings), generationLock.JobId);
+                return (false, MissionResultJson("FAIL", template.MissionId, new[] { ToRepoPath(context.TemplatePath!) }, findings));
+            }
+
             File.WriteAllText(payloadPath, payloadNode.ToJsonString() + Environment.NewLine);
             File.WriteAllText(reportPath, BuildCompileReportNode(template.MissionId, ToRepoPath(context.TemplatePath!), ToRepoPath(payloadPath), findings).ToJsonString() + Environment.NewLine);
             WriteMissionState(missionDir, template.MissionId, "COMPILED", "compile_payload", "", LastFindingCode(findings), generationLock.JobId);
@@ -350,6 +358,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             if (payloadNode != null)
             {
                 ValidateProfileRefs(payloadNode, findings);
+                ValidateCatalogRefs(payloadNode, findings);
             }
 
             if (layoutNode != null && entitiesNode != null)
@@ -655,7 +664,8 @@ namespace BreachScenarioEngine.Mcp.Editor
                     ["primary"] = new JsonArray(template.PrimaryObjectives.Select(ObjectiveNode).ToArray()),
                     ["secondary"] = new JsonArray(template.SecondaryObjectives.Select(ObjectiveNode).ToArray())
                 },
-                ["profileRefs"] = template.ProfileRefs()
+                ["profileRefs"] = template.ProfileRefs(),
+                ["catalogRefs"] = template.CatalogRefs()
             };
         }
 
@@ -1278,6 +1288,38 @@ namespace BreachScenarioEngine.Mcp.Editor
             }
         }
 
+        private static void ValidateCatalogRefs(JsonObject payloadNode, List<JsonObject> findings)
+        {
+            if (payloadNode["catalogRefs"] is not JsonObject catalogRefs)
+            {
+                findings.Add(Finding("error", "CATALOG_REFS_MISSING", "Payload is missing catalogRefs"));
+                return;
+            }
+
+            var required = new[]
+            {
+                "enemyCatalog",
+                "environmentCatalog",
+                "objectiveCatalog"
+            };
+
+            foreach (var key in required)
+            {
+                var assetPath = catalogRefs[key]?.GetValue<string>() ?? "";
+                if (string.IsNullOrWhiteSpace(assetPath))
+                {
+                    findings.Add(Finding("error", "CATALOG_REF_MISSING", $"Payload catalogRefs.{key} is missing"));
+                    continue;
+                }
+
+                var absolutePath = ToAbsoluteProjectPath(assetPath);
+                if (!IsUnderProjectRoot(absolutePath) || (!File.Exists(absolutePath) && AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) == null))
+                {
+                    findings.Add(Finding("error", "CATALOG_REF_MISSING", $"Catalog reference does not resolve: {assetPath}", assetPath));
+                }
+            }
+        }
+
         private static int CountLight2DObjects()
         {
             var light2DType = Type.GetType("UnityEngine.Rendering.Universal.Light2D, Unity.RenderPipelines.Universal.Runtime");
@@ -1363,6 +1405,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                 else
                 {
                     ValidateProfileRefs(payloadNode, attemptFindings);
+                    ValidateCatalogRefs(payloadNode, attemptFindings);
                 }
 
                 var metrics = ComputeVerificationMetrics(layoutNode, placementNode, attemptFindings);
@@ -1473,13 +1516,14 @@ namespace BreachScenarioEngine.Mcp.Editor
         private static List<JsonObject> ValidatePayloadShape(JsonObject payload)
         {
             var findings = new List<JsonObject>();
-            RequireAllowedKeys(payload, "payload", new[] { "header", "spatial", "logic", "roster", "objectives", "profileRefs" }, findings);
+            RequireAllowedKeys(payload, "payload", new[] { "header", "spatial", "logic", "roster", "objectives", "profileRefs", "catalogRefs" }, findings);
             var header = RequiredPayloadObject(payload, "header", findings);
             var spatial = RequiredPayloadObject(payload, "spatial", findings);
             var logic = RequiredPayloadObject(payload, "logic", findings);
             RequiredPayloadArray(payload, "roster", findings);
             var objectives = RequiredPayloadObject(payload, "objectives", findings);
             var profileRefs = RequiredPayloadObject(payload, "profileRefs", findings);
+            var catalogRefs = RequiredPayloadObject(payload, "catalogRefs", findings);
 
             if (header != null)
             {
@@ -1544,6 +1588,16 @@ namespace BreachScenarioEngine.Mcp.Editor
                     "navigationPolicy",
                     "tacticalDensityProfile",
                     "addressablesCatalogProfile"
+                }, findings);
+            }
+
+            if (catalogRefs != null)
+            {
+                RequireAllowedKeys(catalogRefs, "catalogRefs", new[]
+                {
+                    "enemyCatalog",
+                    "environmentCatalog",
+                    "objectiveCatalog"
                 }, findings);
             }
 
@@ -1673,6 +1727,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["layoutRevisionId"] = layoutRevisionId,
                 ["lockOwner"] = LockOwner,
                 ["profileRefs"] = (payloadNode["profileRefs"] as JsonObject)?.DeepClone() ?? template.ProfileRefs(),
+                ["catalogRefs"] = (payloadNode["catalogRefs"] as JsonObject)?.DeepClone() ?? template.CatalogRefs(),
                 ["artifacts"] = ManifestArtifactsObject(artifacts),
                 ["verification"] = new JsonObject
                 {
@@ -2048,6 +2103,17 @@ namespace BreachScenarioEngine.Mcp.Editor
                     ["navigationPolicy"] = $"{root}/NavigationPolicy.asset",
                     ["tacticalDensityProfile"] = $"{root}/TacticalDensityProfile.asset",
                     ["addressablesCatalogProfile"] = $"{root}/AddressablesCatalogProfile.asset"
+                };
+            }
+
+            public JsonObject CatalogRefs()
+            {
+                const string root = "Assets/Data/Mission/Catalogs";
+                return new JsonObject
+                {
+                    ["enemyCatalog"] = $"{root}/EnemyCatalog.asset",
+                    ["environmentCatalog"] = $"{root}/EnvironmentCatalog.asset",
+                    ["objectiveCatalog"] = $"{root}/ObjectiveCatalog.asset"
                 };
             }
 

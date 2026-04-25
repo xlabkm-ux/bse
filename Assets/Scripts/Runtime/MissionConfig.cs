@@ -16,6 +16,9 @@ namespace BreachScenarioEngine.Runtime
         [SerializeField] private string entitiesPath = "";
         [SerializeField] private string verificationSummaryPath = "";
         [SerializeField] private string generationManifestPath = "";
+        [SerializeField] private MissionCatalogAsset enemyCatalog;
+        [SerializeField] private MissionCatalogAsset environmentCatalog;
+        [SerializeField] private MissionCatalogAsset objectiveCatalog;
 
         public string MissionId => missionId;
         public string MissionTitle => missionTitle;
@@ -28,5 +31,8 @@ namespace BreachScenarioEngine.Runtime
         public string EntitiesPath => entitiesPath;
         public string VerificationSummaryPath => verificationSummaryPath;
         public string GenerationManifestPath => generationManifestPath;
+        public MissionCatalogAsset EnemyCatalog => enemyCatalog;
+        public MissionCatalogAsset EnvironmentCatalog => environmentCatalog;
+        public MissionCatalogAsset ObjectiveCatalog => objectiveCatalog;
     }
 }

@@ -313,7 +313,7 @@ Exit criteria:
 
 Status:
 
-- pending
+- completed
 
 Goal:
 
@@ -327,11 +327,37 @@ Work:
 - add CI runner that executes the canonical mission pipeline and optional
   scene preview materialization
 
+Completed:
+
+- extended `mission_payload.generated.json` and `generation_manifest.json`
+  with repo-relative `catalogRefs`
+- validated catalog references alongside profile references before Step 6 and
+  again during verification/retry flows
+- bound `MissionConfig` assets to the repo-owned catalog assets and taught the
+  runtime scene materializer to require the catalog assets during preview
+- added optional scene preview materialization to
+  `Assets/Editor/CI/PilotMissionPipelineCi.cs` behind the
+  `BSE_CI_MATERIALIZE_SCENE_PREVIEW` environment flag
+- updated the editmode smoke tests to assert catalog references and mission
+  catalog bindings
+
+Verification:
+
+- Unity editmode test run completed successfully with `21/21` tests passing
+- results were saved to
+  `C:\Users\MY\AppData\LocalLow\DefaultCompany\BreachScenarioEngine\TestResults.xml`
+
 Exit criteria:
 
 - missing content is reported as JSON findings
 - `verification_summary.json` is the decision source
 - CI never writes an accepted manifest unless Step 7 PASS is proven
+
+Handoff note:
+
+- "Catalog references now flow through payload, verification, manifest, and
+  runtime preview. The transfer track is complete for the current v2.3
+  content-layer session."
 
 ## Active Continuation: v2.3 Stabilization
 

@@ -18,6 +18,7 @@ namespace BreachScenarioEngine.Runtime
     {
         public int roomCount;
         public int portalCount;
+        public int catalogCount;
         public int doorCount;
         public int windowCount;
         public int coverCount;
@@ -117,7 +118,18 @@ namespace BreachScenarioEngine.Runtime
             report.metrics.coverCount = layout.CoverGraph.coverPoints != null ? layout.CoverGraph.coverPoints.Length : 0;
             report.metrics.actorCount = entities.actors != null ? entities.actors.Length : 0;
             report.metrics.objectiveCount = entities.objectives != null ? entities.objectives.Length : 0;
+            report.metrics.catalogCount = CountCatalogRefs(config);
             report.metrics.clearedGeneratedObjectCount = clearedGeneratedObjectCount;
+
+            ValidateCatalogRefs(config, findings, artifacts);
+            if (findings.Count > 0)
+            {
+                report.status = "FAIL";
+                report.message = findings[0].message;
+                report.findings = findings.ToArray();
+                report.artifacts = artifacts.ToArray();
+                return report;
+            }
 
             MaterializeRooms(layout, context, findings, ref report.metrics.tileCount);
             MaterializePortals(layout, context, rooms, findings, ref report.metrics.doorCount, ref report.metrics.windowCount, ref report.metrics.extractionZoneCount);
@@ -358,6 +370,65 @@ namespace BreachScenarioEngine.Runtime
                     trigger.Initialize(entities.missionId, objective.entityId);
                 }
             }
+        }
+
+        private static void ValidateCatalogRefs(MissionConfig config, List<MissionSceneMaterializationFinding> findings, List<string> artifacts)
+        {
+            if (config == null)
+            {
+                findings.Add(Finding("SCENE_CONFIG_MISSING", "MissionConfig is missing.", ""));
+                return;
+            }
+
+            ValidateCatalogAsset(config.EnemyCatalog, "enemyCatalog", findings, artifacts);
+            ValidateCatalogAsset(config.EnvironmentCatalog, "environmentCatalog", findings, artifacts);
+            ValidateCatalogAsset(config.ObjectiveCatalog, "objectiveCatalog", findings, artifacts);
+        }
+
+        private static void ValidateCatalogAsset(MissionCatalogAsset catalog, string role, List<MissionSceneMaterializationFinding> findings, List<string> artifacts)
+        {
+            if (catalog == null)
+            {
+                findings.Add(Finding("SCENE_CATALOG_MISSING", "Mission catalog is missing: " + role, ""));
+                return;
+            }
+
+            if (!string.Equals(catalog.SchemaVersion, "bse.catalog.v2.3", StringComparison.Ordinal))
+            {
+                findings.Add(Finding("SCENE_CATALOG_VERSION_INVALID", "Mission catalog has an unsupported schema version: " + role, ""));
+            }
+            if (string.IsNullOrWhiteSpace(catalog.CatalogId))
+            {
+                findings.Add(Finding("SCENE_CATALOG_ID_MISSING", "Mission catalog is missing catalogId: " + role, ""));
+            }
+            if (string.IsNullOrWhiteSpace(catalog.CatalogType))
+            {
+                findings.Add(Finding("SCENE_CATALOG_TYPE_MISSING", "Mission catalog is missing catalogType: " + role, ""));
+            }
+        }
+
+        private static int CountCatalogRefs(MissionConfig config)
+        {
+            var count = 0;
+            if (config == null)
+            {
+                return 0;
+            }
+
+            if (config.EnemyCatalog != null)
+            {
+                count++;
+            }
+            if (config.EnvironmentCatalog != null)
+            {
+                count++;
+            }
+            if (config.ObjectiveCatalog != null)
+            {
+                count++;
+            }
+
+            return count;
         }
 
         private static Vector3 ResolveRoomAnchor(IReadOnlyDictionary<string, MissionRoom> rooms, string roomId, string entityId, int slotIndex)

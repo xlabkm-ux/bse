@@ -29,12 +29,17 @@ namespace BreachScenarioEngine.Editor.CI
 
         public static void RunAll()
         {
+            RunAll(ShouldMaterializeScenePreview());
+        }
+
+        public static void RunAll(bool includeScenePreview)
+        {
             var allResults = new List<MissionRunResult>();
             var passed = true;
 
             foreach (var missionId in MissionIds)
             {
-                var result = RunMission(missionId);
+                var result = RunMission(missionId, includeScenePreview);
                 allResults.Add(result);
                 passed &= result.Passed;
             }
@@ -54,7 +59,7 @@ namespace BreachScenarioEngine.Editor.CI
             EditorApplication.Exit(passed ? 0 : 1);
         }
 
-        private static MissionRunResult RunMission(string missionId)
+        private static MissionRunResult RunMission(string missionId, bool includeScenePreview)
         {
             var actionResults = new List<ActionResult>();
             var raw = "{ \"missionId\": \"" + missionId + "\" }";
@@ -70,7 +75,41 @@ namespace BreachScenarioEngine.Editor.CI
                 }
             }
 
+            if (includeScenePreview && actionResults.Count == Actions.Length)
+            {
+                var previewResult = MaterializeScenePreview(missionId);
+                actionResults.Add(previewResult);
+            }
+
             return new MissionRunResult(missionId, actionResults);
+        }
+
+        private static ActionResult MaterializeScenePreview(string missionId)
+        {
+            var configPath = "Assets/Data/Mission/MissionConfig/MissionConfig_" + ShortCode(missionId) + ".asset";
+            var config = AssetDatabase.LoadAssetAtPath<BreachScenarioEngine.Runtime.MissionConfig>(configPath);
+            if (config == null)
+            {
+                return new ActionResult("materialize_scene_preview", false, "FAIL", "{\"status\":\"FAIL\",\"message\":\"MissionConfig missing\",\"missionId\":\"" + missionId + "\"}");
+            }
+
+            var host = new GameObject("PilotScenePreviewHost_" + missionId);
+            try
+            {
+                var loader = host.AddComponent<BreachScenarioEngine.Runtime.MissionRuntimeLoader>();
+                var success = loader.LoadMission(config);
+                if (!success)
+                {
+                    return new ActionResult("materialize_scene_preview", false, "FAIL", "{\"status\":\"FAIL\",\"message\":\"" + EscapeJson(loader.LastError) + "\",\"missionId\":\"" + missionId + "\"}");
+                }
+
+                loader.ClearCurrentRoot();
+                return new ActionResult("materialize_scene_preview", true, "PASS", "{\"status\":\"PASS\",\"message\":\"Scene preview materialized successfully.\",\"missionId\":\"" + missionId + "\"}");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(host);
+            }
         }
 
         private static void WritePilotReports(IReadOnlyList<MissionRunResult> results)
@@ -144,6 +183,21 @@ namespace BreachScenarioEngine.Editor.CI
             return missionId.Length >= 4 ? missionId.Substring(0, 4) : missionId;
         }
 
+        private static bool ShouldMaterializeScenePreview()
+        {
+            var value = Environment.GetEnvironmentVariable("BSE_CI_MATERIALIZE_SCENE_PREVIEW") ?? "";
+            return string.Equals(value, "1", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string EscapeJson(string value)
+        {
+            return string.IsNullOrEmpty(value)
+                ? ""
+                : value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        }
+
         private readonly struct ActionResult
         {
             public ActionResult(string action, bool success, string status, string message)
@@ -166,11 +220,13 @@ namespace BreachScenarioEngine.Editor.CI
             {
                 MissionId = missionId;
                 Actions = actions;
+                IncludeScenePreview = actions.Count > PilotMissionPipelineCi.Actions.Length;
             }
 
             public string MissionId { get; }
             public IReadOnlyList<ActionResult> Actions { get; }
-            public bool Passed => Actions.Count == PilotMissionPipelineCi.Actions.Length && Actions[^1].Success && Actions[^1].Status == "PASS";
+            public bool IncludeScenePreview { get; }
+            public bool Passed => Actions.Count >= PilotMissionPipelineCi.Actions.Length && Actions[^1].Success && Actions[^1].Status == "PASS";
         }
     }
 }
