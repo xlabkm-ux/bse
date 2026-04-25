@@ -385,6 +385,34 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
         }
 
         [Test]
+        public void PlaceEntities_TaggedEnemies_SpreadAcrossLayoutRooms()
+        {
+            var templatePath = Path.Combine(_testRoot, "spread.template.yaml");
+            var payloadPath = Path.Combine(_testRoot, "mission_payload.generated.json");
+            var layoutPath = Path.Combine(_testRoot, "mission_layout.generated.json");
+            var entitiesPath = Path.Combine(_testRoot, "mission_entities.generated.json");
+            File.WriteAllText(templatePath, TaggedEnemyTemplate("VS95_TaggedSpreadMission"));
+
+            var (compileSuccess, compileMessage) = MissionPipelineEditorService.Execute("compile_payload", RawArgs(templatePath, payloadPath));
+            Assert.True(compileSuccess, compileMessage);
+            var (layoutSuccess, layoutMessage) = MissionPipelineEditorService.Execute("generate_layout", RawArgs(templatePath, payloadPath, layoutPath));
+            Assert.True(layoutSuccess, layoutMessage);
+
+            var (success, message) = MissionPipelineEditorService.Execute("place_entities", RawArgs(templatePath, payloadPath, layoutPath, entitiesPath));
+
+            Assert.True(success, message);
+            using var entitiesDoc = JsonDocument.Parse(File.ReadAllText(entitiesPath));
+            var enemyRooms = entitiesDoc.RootElement.GetProperty("actors")
+                .EnumerateArray()
+                .Where(actor => actor.GetProperty("sourceActorId").GetString() == "EN_01")
+                .Select(actor => actor.GetProperty("roomId").GetString())
+                .ToArray();
+
+            Assert.AreEqual(3, enemyRooms.Length);
+            Assert.Greater(enemyRooms.Distinct(StringComparer.Ordinal).Count(), 1);
+        }
+
+        [Test]
         public void PlaceEntities_WithStaleLayout_FailsWithOrderingFinding()
         {
             var templatePath = Path.Combine(_testRoot, "stale.template.yaml");
@@ -990,6 +1018,65 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
                 "  primary:",
                 "    - id: \"OBJ_MAIN\"",
                 "      type: \"SecureRoom\"",
+                "      requiresLayoutGraph: true",
+                "      targetRoomTag: \"security_vault\"",
+                ""
+            });
+        }
+
+        private static string TaggedEnemyTemplate(string missionId)
+        {
+            return string.Join("\n", new[]
+            {
+                "schemaVersion: \"tb.mission_template.v2.3\"",
+                $"missionId: \"{missionId}\"",
+                "missionTitle: \"Tagged Placement Mission\"",
+                "",
+                "generationMeta:",
+                "  initialSeed: 42",
+                "  effectiveSeed: 0",
+                "  generationTimeout: 45",
+                "  maxRetries: 5",
+                "",
+                "spatialConstraints:",
+                "  worldBounds: [64, 64]",
+                "  pixelsPerUnit: 128",
+                "  tacticalTheme: \"urban_cqb\"",
+                "  bspConstraints:",
+                "    minRoomSize: [4, 4]",
+                "    maxRoomSize: [12, 12]",
+                "    corridorWidth: 2",
+                "    forceRoomAdjacency: true",
+                "",
+                "tacticalRules:",
+                "  noiseAlertThreshold: 0.15",
+                "  strictNavigationPolicy: true",
+                "  enforcePostLayoutPlacement: true",
+                "  acousticOcclusion:",
+                "    wallMultiplier: 2.5",
+                "    doorPenalty: 1.2",
+                "",
+                "actorRoster:",
+                "  - id: \"OP_01\"",
+                "    type: \"Operative\"",
+                "    countRange: [1, 1]",
+                "    navigationPolicy: \"FullAccess\"",
+                "    placementPolicy: \"EntryPointOnly\"",
+                "  - id: \"EN_01\"",
+                "    type: \"Sentry\"",
+                "    countRange: [3, 3]",
+                "    navigationPolicy: \"StaticGuard\"",
+                "    placementPolicy: \"PostLayout_TaggedRoom\"",
+                "  - id: \"CIV_01\"",
+                "    type: \"Hostage\"",
+                "    countRange: [1, 1]",
+                "    navigationPolicy: \"Immobilized\"",
+                "    placementPolicy: \"SecureRoomOnly\"",
+                "",
+                "objectives:",
+                "  primary:",
+                "    - id: \"OBJ_MAIN\"",
+                "      type: \"RescueHostage\"",
                 "      requiresLayoutGraph: true",
                 "      targetRoomTag: \"security_vault\"",
                 ""

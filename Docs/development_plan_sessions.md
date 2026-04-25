@@ -222,7 +222,7 @@ Handoff note:
 
 Status:
 
-- pending
+- completed
 
 Goal:
 
@@ -235,6 +235,24 @@ Work:
 - prevent duplicate enemy placement from the legacy BREACH pattern
 - ensure entities include stable ownership metadata, `roomId`, `navNodeId`,
   and `layoutRevisionId`
+
+Completed:
+
+- replaced the simple round-robin room choice with layout-aware placement
+  candidates keyed off `layoutRevisionId`
+- kept `EntryPointOnly` and `SecureRoomOnly` anchored to their layout-derived
+  rooms
+- spread `PostLayout_TaggedRoom` actors across multiple layout rooms instead of
+  stacking every enemy into one room
+- added a regression test that verifies tagged enemy placements span more than
+  one room on the same generated layout
+
+Verification:
+
+- Unity batchmode recompiled the updated `BreachScenarioEngine.Mcp.Editor` and
+  `BreachScenarioEngine.Mcp.Editor.Tests` assemblies successfully
+- the batchmode session did not emit a test XML report before it quit, so the
+  verification here is compile-level rather than a finished EditMode result
 
 Exit criteria:
 

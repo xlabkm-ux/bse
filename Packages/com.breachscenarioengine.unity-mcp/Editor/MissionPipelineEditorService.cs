@@ -881,14 +881,14 @@ namespace BreachScenarioEngine.Mcp.Editor
 
         private static JsonObject RoomForActor(MissionActor actor, IReadOnlyList<JsonObject> rooms, JsonObject layoutNode, int index)
         {
-            return actor.PlacementPolicy switch
+            var candidates = PlacementRoomsForActor(actor, rooms, layoutNode);
+            if (candidates.Count == 0)
             {
-                "EntryPointOnly" => EntryRoom(rooms, layoutNode),
-                "PostLayout_TaggedRoom" => FirstObjectiveRoom(rooms, layoutNode),
-                "PostLayout_AnyRoom" => rooms.Count == 0 ? EntryRoom(rooms, layoutNode) : rooms[(index + 1) % rooms.Count],
-                "SecureRoomOnly" => RoomByTag(rooms, "security_vault") ?? FirstObjectiveRoom(rooms, layoutNode),
-                _ => EntryRoom(rooms, layoutNode)
-            };
+                return EntryRoom(rooms, layoutNode);
+            }
+
+            var startIndex = StablePlacementOffset(layoutNode["layoutRevisionId"]?.GetValue<string>() ?? "", actor.Id, actor.PlacementPolicy, candidates.Count);
+            return candidates[(startIndex + index) % candidates.Count];
         }
 
         private static JsonObject RoomForObjective(MissionObjective objective, IReadOnlyList<JsonObject> rooms, JsonObject layoutNode)
@@ -937,6 +937,86 @@ namespace BreachScenarioEngine.Mcp.Editor
         private static JsonObject? RoomByTag(IReadOnlyList<JsonObject> rooms, string tag)
         {
             return rooms.FirstOrDefault(room => string.Equals(room["tag"]?.GetValue<string>(), tag, StringComparison.Ordinal));
+        }
+
+        private static List<JsonObject> PlacementRoomsForActor(MissionActor actor, IReadOnlyList<JsonObject> rooms, JsonObject layoutNode)
+        {
+            var entryRoom = EntryRoom(rooms, layoutNode);
+            var objectiveRoom = FirstObjectiveRoom(rooms, layoutNode);
+            var secureRoom = RoomByTag(rooms, "security_vault");
+            var orderedRooms = OrderedPlacementRooms(rooms, layoutNode);
+
+            return actor.PlacementPolicy switch
+            {
+                "EntryPointOnly" => UniqueRooms(new[] { entryRoom }),
+                "PostLayout_TaggedRoom" => UniqueRooms(new[] { objectiveRoom }.Concat(orderedRooms.Where(room => !SameRoom(room, entryRoom) && !SameRoom(room, objectiveRoom)))),
+                "PostLayout_AnyRoom" => UniqueRooms(orderedRooms.Where(room => !SameRoom(room, entryRoom))),
+                "SecureRoomOnly" => UniqueRooms(new[] { secureRoom, objectiveRoom, entryRoom }),
+                _ => UniqueRooms(new[] { entryRoom })
+            };
+        }
+
+        private static List<JsonObject> OrderedPlacementRooms(IReadOnlyList<JsonObject> rooms, JsonObject layoutNode)
+        {
+            var ordered = new List<JsonObject>();
+            AddRoomIfMissing(ordered, EntryRoom(rooms, layoutNode));
+            AddRoomIfMissing(ordered, RoomByTag(rooms, "security_vault"));
+            AddRoomIfMissing(ordered, FirstObjectiveRoom(rooms, layoutNode));
+
+            foreach (var room in rooms
+                         .OrderBy(room => room["tag"]?.GetValue<string>() ?? string.Empty, StringComparer.Ordinal)
+                         .ThenBy(room => room["id"]?.GetValue<string>() ?? string.Empty, StringComparer.Ordinal))
+            {
+                AddRoomIfMissing(ordered, room);
+            }
+
+            return ordered;
+        }
+
+        private static List<JsonObject> UniqueRooms(IEnumerable<JsonObject?> rooms)
+        {
+            var ordered = new List<JsonObject>();
+            foreach (var room in rooms)
+            {
+                AddRoomIfMissing(ordered, room);
+            }
+
+            return ordered;
+        }
+
+        private static void AddRoomIfMissing(List<JsonObject> rooms, JsonObject? room)
+        {
+            if (room == null)
+            {
+                return;
+            }
+
+            var roomId = room["id"]?.GetValue<string>() ?? "";
+            if (string.IsNullOrWhiteSpace(roomId) || rooms.Any(existing => SameRoom(existing, room)))
+            {
+                return;
+            }
+
+            rooms.Add(room);
+        }
+
+        private static bool SameRoom(JsonObject left, JsonObject right)
+        {
+            return string.Equals(left["id"]?.GetValue<string>() ?? "", right["id"]?.GetValue<string>() ?? "", StringComparison.Ordinal);
+        }
+
+        private static int StablePlacementOffset(string layoutRevisionId, string actorId, string placementPolicy, int candidateCount)
+        {
+            if (candidateCount <= 1)
+            {
+                return 0;
+            }
+
+            using var sha = SHA256.Create();
+            var source = $"{layoutRevisionId}:{actorId}:{placementPolicy}:{PipelineVersion}";
+            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(source));
+            var value = BitConverter.ToInt32(bytes, 0) & int.MaxValue;
+            return value % candidateCount;
         }
 
         private static string ComputeLayoutRevisionId(MissionTemplateModel template)
