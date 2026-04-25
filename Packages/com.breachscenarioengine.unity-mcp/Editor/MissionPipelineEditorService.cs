@@ -1179,74 +1179,25 @@ namespace BreachScenarioEngine.Mcp.Editor
                 findings.Add(Finding("error", "NAV_BREACHPOINT_UNREACHABLE", "LayoutGraph entryRoomId is missing from RoomGraph"));
             }
 
-            var enemyCount = actors.Count(a =>
-            {
-                var type = a["type"]?.GetValue<string>() ?? "";
-                return type.Contains("Enemy", StringComparison.OrdinalIgnoreCase) ||
-                       type.Contains("Sentry", StringComparison.OrdinalIgnoreCase) ||
-                       type.Contains("Roamer", StringComparison.OrdinalIgnoreCase);
-            });
-            var objectiveRoomIds = objectives
-                .Select(o => o["roomId"]?.GetValue<string>() ?? "")
-                .Where(id => !string.IsNullOrWhiteSpace(id))
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-            var portalPairs = UndirectedEdgePairs(layoutNode["PortalGraph"]?["portals"] as JsonArray);
-            var visibilityPairs = UndirectedEdgePairs(layoutNode["VisibilityGraph"]?["edges"] as JsonArray);
-            var hearingPairs = UndirectedEdgePairs(layoutNode["HearingGraph"]?["edges"] as JsonArray);
-            var sharedHearingVisibilityPairs = hearingPairs.Intersect(visibilityPairs, StringComparer.Ordinal).Count();
-            var portalDegrees = RoomDegrees(rooms, portalPairs);
-            var coverPointCount = (layoutNode["CoverGraph"]?["coverPoints"] as JsonArray)?.Count ?? 0;
-            var activeHearingChecks = (layoutNode["HearingGraph"]?["edges"] as JsonArray)?.Count ?? 0;
-            var visibilityRayCount = (layoutNode["VisibilityGraph"]?["edges"] as JsonArray)?.Count ?? 0;
-            var alternateRoutes = Math.Max(0, portalPairs.Count - Math.Max(0, rooms.Count - 1));
-            var hearingOverlapPercentage = activeHearingChecks > 0
-                ? Math.Round(sharedHearingVisibilityPairs * 100.0 / activeHearingChecks, 2)
-                : 0;
-            var chokepointRooms = portalDegrees.Values.Count(degree => degree <= 1);
-            var chokepointPressure = rooms.Count > 0 ? Math.Round(chokepointRooms * 100.0 / rooms.Count, 2) : 0;
-            var objectiveRoomPressure = objectiveRoomIds.Count > 0
-                ? Math.Round(objectiveRoomIds.Sum(roomId => objectiveRoomOccupancy.TryGetValue(roomId, out var occupancy) ? occupancy : 0) * 1.0 / objectiveRoomIds.Count, 2)
-                : 0;
-
-            if (rooms.Count > 0 && actors.Count > rooms.Count * 6)
-            {
-                findings.Add(Finding("error", "TACTICAL_DENSITY_IMPOSSIBLE_BUDGET", "Actor density exceeds the verification budget of six actors per room"));
-            }
-
-            if (enemyCount > 0 && coverPointCount < enemyCount)
-            {
-                findings.Add(Finding("error", "TACTICAL_DENSITY_IMPOSSIBLE_BUDGET", "Enemy count exceeds available cover points"));
-            }
-
-            if (activeHearingChecks > 64)
-            {
-                findings.Add(Finding("error", "TB-AUD-003", "Active hearing edge count exceeds the verification budget"));
-            }
-
-            if (visibilityRayCount > 128)
-            {
-                findings.Add(Finding("error", "PERFORMANCE_BUDGET_EXCEEDED", "Visibility ray count exceeds the verification budget"));
-            }
-
+            var tacticalMetrics = TacticalGraphBuilder.BuildVerificationTacticalMetrics(layoutNode, entitiesNode, findings);
             var metrics = EmptyVerificationMetrics();
-            metrics["enemyCount"] = enemyCount;
+            metrics["enemyCount"] = tacticalMetrics["enemyCount"]?.GetValue<int>() ?? 0;
             metrics["roomCount"] = rooms.Count;
             metrics["emptyRoomCount"] = rooms.Count(room => !occupiedRooms.Contains(room["id"]?.GetValue<string>() ?? ""));
             metrics["light2DCount"] = CountLight2DObjects();
-            metrics["activeHearingChecks"] = activeHearingChecks;
-            metrics["visibilityRayCount"] = visibilityRayCount;
+            metrics["activeHearingChecks"] = tacticalMetrics["activeHearingChecks"]?.GetValue<int>() ?? 0;
+            metrics["visibilityRayCount"] = tacticalMetrics["visibilityRayCount"]?.GetValue<int>() ?? 0;
             metrics["unreachableCriticalNodes"] = unreachableCriticalNodes;
             metrics["actorCount"] = actors.Count;
             metrics["objectiveCount"] = objectives.Count;
-            metrics["coverPointCount"] = coverPointCount;
+            metrics["coverPointCount"] = tacticalMetrics["coverPointCount"]?.GetValue<int>() ?? 0;
             metrics["reachableObjectives"] = reachableObjectives;
             metrics["unreachableObjectives"] = Math.Max(0, objectives.Count - reachableObjectives);
-            metrics["averageCoverPerRoom"] = rooms.Count > 0 ? Math.Round(coverPointCount * 1.0 / rooms.Count, 2) : 0;
-            metrics["alternateRoutes"] = alternateRoutes;
-            metrics["hearingOverlapPercentage"] = hearingOverlapPercentage;
-            metrics["chokepointPressure"] = chokepointPressure;
-            metrics["objectiveRoomPressure"] = objectiveRoomPressure;
+            metrics["averageCoverPerRoom"] = tacticalMetrics["averageCoverPerRoom"]?.GetValue<double>() ?? 0;
+            metrics["alternateRoutes"] = tacticalMetrics["alternateRoutes"]?.GetValue<int>() ?? 0;
+            metrics["hearingOverlapPercentage"] = tacticalMetrics["hearingOverlapPercentage"]?.GetValue<double>() ?? 0;
+            metrics["chokepointPressure"] = tacticalMetrics["chokepointPressure"]?.GetValue<double>() ?? 0;
+            metrics["objectiveRoomPressure"] = tacticalMetrics["objectiveRoomPressure"]?.GetValue<double>() ?? 0;
             return metrics;
         }
 
@@ -1747,61 +1698,6 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["missionState"] = unique.FirstOrDefault(p => p.EndsWith("mission_state.json", StringComparison.Ordinal)) ?? ""
             };
             return result;
-        }
-
-        private static HashSet<string> UndirectedEdgePairs(JsonArray? edges)
-        {
-            var pairs = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var edge in edges?.OfType<JsonObject>() ?? Enumerable.Empty<JsonObject>())
-            {
-                var from = edge["fromRoomId"]?.GetValue<string>() ?? "";
-                var to = edge["toRoomId"]?.GetValue<string>() ?? "";
-                if (string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(to))
-                {
-                    continue;
-                }
-
-                pairs.Add(RoomPairKey(from, to));
-            }
-
-            return pairs;
-        }
-
-        private static Dictionary<string, int> RoomDegrees(IReadOnlyList<JsonObject> rooms, HashSet<string> edgePairs)
-        {
-            var degrees = rooms
-                .Select(room => room["id"]?.GetValue<string>() ?? "")
-                .Where(id => !string.IsNullOrWhiteSpace(id))
-                .Distinct(StringComparer.Ordinal)
-                .ToDictionary(id => id, _ => 0, StringComparer.Ordinal);
-
-            foreach (var pair in edgePairs)
-            {
-                var separatorIndex = pair.IndexOf('|');
-                if (separatorIndex <= 0 || separatorIndex >= pair.Length - 1)
-                {
-                    continue;
-                }
-
-                var left = pair.Substring(0, separatorIndex);
-                var right = pair.Substring(separatorIndex + 1);
-                if (degrees.ContainsKey(left))
-                {
-                    degrees[left]++;
-                }
-
-                if (degrees.ContainsKey(right))
-                {
-                    degrees[right]++;
-                }
-            }
-
-            return degrees;
-        }
-
-        private static string RoomPairKey(string a, string b)
-        {
-            return string.CompareOrdinal(a, b) <= 0 ? $"{a}|{b}" : $"{b}|{a}";
         }
 
         private static int ExistingAcceptedEffectiveSeed(JsonObject? existingManifest)

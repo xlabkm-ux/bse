@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -220,6 +221,109 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
 
             using var payloadDoc = JsonDocument.Parse(File.ReadAllText(payloadPath));
             Assert.AreEqual(firstRevision, payloadDoc.RootElement.GetProperty("header").GetProperty("layoutRevisionId").GetString());
+        }
+
+        [Test]
+        public void TacticalGraphBuilder_BuildsDeterministicGraphsAndMetrics()
+        {
+            var rooms = new List<JsonObject>
+            {
+                Room("room_entry", "layout_test", "entry", 0, 0, 8, 8),
+                Room("room_living", "layout_test", "living_area", 8, 0, 8, 8),
+                Room("room_hallway", "layout_test", "hallway", 0, 8, 8, 8),
+                Room("room_vault", "layout_test", "security_vault", 8, 8, 8, 8)
+            };
+            var portals = new List<JsonObject>
+            {
+                Portal("portal_entry_living", "layout_test", "room_entry", "room_living", 8, 4),
+                Portal("portal_entry_hallway", "layout_test", "room_entry", "room_hallway", 4, 8),
+                Portal("portal_hallway_vault", "layout_test", "room_hallway", "room_vault", 8, 12),
+                Portal("portal_living_vault", "layout_test", "room_living", "room_vault", 12, 8)
+            };
+            var breachPoints = new List<JsonObject>
+            {
+                new JsonObject
+                {
+                    ["id"] = "breach_01",
+                    ["layoutRevisionId"] = "layout_test",
+                    ["roomId"] = "room_entry",
+                    ["navNodeId"] = "nav_entry",
+                    ["kind"] = "entry_door",
+                    ["side"] = "south",
+                    ["x"] = 4,
+                    ["y"] = 0,
+                    ["width"] = 1
+                }
+            };
+
+            var firstCover = TacticalGraphBuilder.BuildCoverGraph("layout_test", rooms, portals, breachPoints, 6);
+            var secondCover = TacticalGraphBuilder.BuildCoverGraph("layout_test", rooms, portals, breachPoints, 6);
+            Assert.AreEqual(firstCover.ToJsonString(), secondCover.ToJsonString());
+            Assert.AreEqual(6, firstCover["coverPoints"]!.AsArray().Count);
+
+            var visibility = TacticalGraphBuilder.BuildVisibilityGraph("layout_test", portals);
+            var hearing = TacticalGraphBuilder.BuildHearingGraph("layout_test", portals, 2.0, 1.1);
+            Assert.AreEqual(4, visibility["edges"]!.AsArray().Count);
+            Assert.AreEqual(4, hearing["edges"]!.AsArray().Count);
+            Assert.AreEqual(2.0, hearing["wallMultiplier"]!.GetValue<double>());
+
+            var layoutNode = new JsonObject
+            {
+                ["LayoutGraph"] = new JsonObject
+                {
+                    ["entryRoomId"] = "room_entry"
+                },
+                ["RoomGraph"] = new JsonObject
+                {
+                    ["rooms"] = new JsonArray(rooms.Select(room => (JsonNode?)room.DeepClone()).ToArray())
+                },
+                ["PortalGraph"] = new JsonObject
+                {
+                    ["portals"] = new JsonArray(portals.Select(portal => (JsonNode?)portal.DeepClone()).ToArray())
+                },
+                ["CoverGraph"] = firstCover,
+                ["VisibilityGraph"] = visibility,
+                ["HearingGraph"] = hearing
+            };
+            var entitiesNode = new JsonObject
+            {
+                ["actors"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["entityId"] = "actor_01",
+                        ["kind"] = "actor",
+                        ["type"] = "Sentry",
+                        ["roomId"] = "room_living"
+                    },
+                    new JsonObject
+                    {
+                        ["entityId"] = "actor_02",
+                        ["kind"] = "actor",
+                        ["type"] = "Roamer",
+                        ["roomId"] = "room_vault"
+                    }
+                },
+                ["objectives"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["entityId"] = "objective_01",
+                        ["kind"] = "objective",
+                        ["roomId"] = "room_vault"
+                    }
+                }
+            };
+
+            var findings = new List<JsonObject>();
+            var metrics = TacticalGraphBuilder.BuildVerificationTacticalMetrics(layoutNode, entitiesNode, findings);
+
+            Assert.AreEqual(2, metrics["enemyCount"]!.GetValue<int>());
+            Assert.AreEqual(6, metrics["coverPointCount"]!.GetValue<int>());
+            Assert.AreEqual(1, metrics["alternateRoutes"]!.GetValue<int>());
+            Assert.AreEqual(0.0, metrics["chokepointPressure"]!.GetValue<double>());
+            Assert.Greater(metrics["hearingOverlapPercentage"]!.GetValue<double>(), 0);
+            Assert.AreEqual(0, findings.Count);
         }
 
         [Test]
@@ -738,6 +842,40 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             }
         }
 
+        private static JsonObject Room(string id, string revisionId, string tag, int x, int y, int width, int height)
+        {
+            return new JsonObject
+            {
+                ["id"] = id,
+                ["layoutRevisionId"] = revisionId,
+                ["tag"] = tag,
+                ["rect"] = new JsonObject
+                {
+                    ["x"] = x,
+                    ["y"] = y,
+                    ["width"] = width,
+                    ["height"] = height
+                },
+                ["navNodeId"] = $"nav_{id.Substring("room_".Length)}"
+            };
+        }
+
+        private static JsonObject Portal(string id, string revisionId, string fromRoomId, string toRoomId, int x, int y)
+        {
+            return new JsonObject
+            {
+                ["id"] = id,
+                ["layoutRevisionId"] = revisionId,
+                ["fromRoomId"] = fromRoomId,
+                ["toRoomId"] = toRoomId,
+                ["kind"] = "door",
+                ["orientation"] = "vertical",
+                ["x"] = x,
+                ["y"] = y,
+                ["width"] = 2
+            };
+        }
+
         private static string RawArgs(string templatePath, string payloadPath = null, string layoutPath = null, string entitiesPath = null, string verificationPath = null, string manifestPath = null)
         {
             var template = ToRepoPath(templatePath);
@@ -866,4 +1004,3 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
         }
     }
 }
-

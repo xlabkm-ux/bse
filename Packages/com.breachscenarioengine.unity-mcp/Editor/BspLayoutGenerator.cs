@@ -56,9 +56,20 @@ namespace BreachScenarioEngine.Mcp.Editor
             var portals = BuildPortals(roomModels, options.LayoutRevisionId, Math.Max(1, options.CorridorWidth), options.ForceAdjacency);
             var windows = BuildWindows(roomModels, options.LayoutRevisionId, boundsWidth, boundsHeight);
             var breachPoints = BuildBreachPoints(roomModels, options.LayoutRevisionId);
-            var coverPoints = BuildCoverPoints(roomModels, portals, breachPoints, options.LayoutRevisionId, Math.Max(roomModels.Count, options.CoverBudget));
-            var visibilityEdges = BuildVisibilityEdges(portals, options.LayoutRevisionId);
-            var hearingEdges = BuildHearingEdges(portals, options.LayoutRevisionId, options.DoorPenalty);
+            var coverGraph = TacticalGraphBuilder.BuildCoverGraph(
+                options.LayoutRevisionId,
+                roomModels.Select(room => room.ToJson()).ToList(),
+                portals.Select(portal => (JsonObject)portal.ToJson().DeepClone()).ToList(),
+                breachPoints.Select(breachPoint => (JsonObject)breachPoint.DeepClone()).ToList(),
+                Math.Max(roomModels.Count, options.CoverBudget));
+            var visibilityGraph = TacticalGraphBuilder.BuildVisibilityGraph(
+                options.LayoutRevisionId,
+                portals.Select(portal => (JsonObject)portal.ToJson().DeepClone()).ToList());
+            var hearingGraph = TacticalGraphBuilder.BuildHearingGraph(
+                options.LayoutRevisionId,
+                portals.Select(portal => (JsonObject)portal.ToJson().DeepClone()).ToList(),
+                options.WallMultiplier,
+                options.DoorPenalty);
 
             var entryRoomId = roomModels.First(r => string.Equals(r.Tag, "entry", StringComparison.Ordinal)).Id;
             var objectiveRoomIds = roomModels
@@ -108,23 +119,9 @@ namespace BreachScenarioEngine.Mcp.Editor
                     ["portals"] = new JsonArray(portals.Select(p => (JsonNode?)p.ToJson()).ToArray()),
                     ["windows"] = new JsonArray(windows.Select(w => (JsonNode?)w).ToArray())
                 },
-                ["CoverGraph"] = new JsonObject
-                {
-                    ["layoutRevisionId"] = options.LayoutRevisionId,
-                    ["coverPoints"] = new JsonArray(coverPoints.Select(c => (JsonNode?)c).ToArray())
-                },
-                ["VisibilityGraph"] = new JsonObject
-                {
-                    ["layoutRevisionId"] = options.LayoutRevisionId,
-                    ["edges"] = new JsonArray(visibilityEdges.Select(e => (JsonNode?)e).ToArray())
-                },
-                ["HearingGraph"] = new JsonObject
-                {
-                    ["layoutRevisionId"] = options.LayoutRevisionId,
-                    ["wallMultiplier"] = options.WallMultiplier,
-                    ["doorPenalty"] = options.DoorPenalty,
-                    ["edges"] = new JsonArray(hearingEdges.Select(e => (JsonNode?)e).ToArray())
-                }
+                ["CoverGraph"] = coverGraph,
+                ["VisibilityGraph"] = visibilityGraph,
+                ["HearingGraph"] = hearingGraph
             };
         }
 
@@ -393,76 +390,6 @@ namespace BreachScenarioEngine.Mcp.Editor
             };
         }
 
-        private static List<JsonObject> BuildCoverPoints(IReadOnlyList<RoomModel> rooms, IReadOnlyList<PortalModel> portals, IReadOnlyList<JsonObject> breachPoints, string revisionId, int coverBudget)
-        {
-            var covers = new List<JsonObject>();
-            var roomsById = rooms.ToDictionary(r => r.Id, StringComparer.Ordinal);
-            for (var index = 0; index < coverBudget; index++)
-            {
-                var room = rooms[index % rooms.Count];
-                var offset = 1 + (index / rooms.Count) % 3;
-                var x = Clamp(room.Rect.X + offset, room.Rect.X + 1, room.Rect.Right - 1);
-                var y = Clamp(room.Rect.Top - offset, room.Rect.Y + 1, room.Rect.Top - 1);
-
-                if (TooCloseToPortal(room.Id, x, y, portals) || TooCloseToBreach(room.Id, x, y, breachPoints))
-                {
-                    x = Clamp(room.Rect.Right - offset, room.Rect.X + 1, room.Rect.Right - 1);
-                    y = Clamp(room.Rect.Y + offset, room.Rect.Y + 1, room.Rect.Top - 1);
-                }
-
-                covers.Add(new JsonObject
-                {
-                    ["id"] = $"cover_{index + 1:00}",
-                    ["layoutRevisionId"] = revisionId,
-                    ["roomId"] = room.Id,
-                    ["navNodeId"] = roomsById[room.Id].NavNodeId,
-                    ["x"] = x,
-                    ["y"] = y,
-                    ["quality"] = index % 4 == 0 ? "low" : "medium"
-                });
-            }
-
-            return covers;
-        }
-
-        private static bool TooCloseToPortal(string roomId, int x, int y, IEnumerable<PortalModel> portals)
-        {
-            return portals.Any(p =>
-                (string.Equals(p.FromRoomId, roomId, StringComparison.Ordinal) || string.Equals(p.ToRoomId, roomId, StringComparison.Ordinal)) &&
-                Math.Abs(p.X - x) + Math.Abs(p.Y - y) < 3);
-        }
-
-        private static bool TooCloseToBreach(string roomId, int x, int y, IEnumerable<JsonObject> breachPoints)
-        {
-            return breachPoints.Any(b =>
-                string.Equals(b["roomId"]?.GetValue<string>(), roomId, StringComparison.Ordinal) &&
-                Math.Abs((b["x"]?.GetValue<int>() ?? x) - x) + Math.Abs((b["y"]?.GetValue<int>() ?? y) - y) < 3);
-        }
-
-        private static List<JsonObject> BuildVisibilityEdges(IReadOnlyList<PortalModel> portals, string revisionId)
-        {
-            return portals.Select((portal, index) => new JsonObject
-            {
-                ["layoutRevisionId"] = revisionId,
-                ["fromRoomId"] = portal.FromRoomId,
-                ["toRoomId"] = portal.ToRoomId,
-                ["portalId"] = portal.Id,
-                ["openness"] = Math.Max(0.25, 0.75 - index * 0.03)
-            }).ToList();
-        }
-
-        private static List<JsonObject> BuildHearingEdges(IReadOnlyList<PortalModel> portals, string revisionId, double doorPenalty)
-        {
-            return portals.Take(64).Select(portal => new JsonObject
-            {
-                ["layoutRevisionId"] = revisionId,
-                ["fromRoomId"] = portal.FromRoomId,
-                ["toRoomId"] = portal.ToRoomId,
-                ["portalId"] = portal.Id,
-                ["attenuation"] = doorPenalty
-            }).ToList();
-        }
-
         private static JsonArray IntArrayNode(IReadOnlyList<int> values)
         {
             var array = new JsonArray();
@@ -472,16 +399,6 @@ namespace BreachScenarioEngine.Mcp.Editor
             }
 
             return array;
-        }
-
-        private static int Clamp(int value, int min, int max)
-        {
-            if (max < min)
-            {
-                return min;
-            }
-
-            return Math.Min(Math.Max(value, min), max);
         }
 
         private static double DistanceSquared(double ax, double ay, double bx, double by)

@@ -184,7 +184,7 @@ Handoff note:
 
 Status:
 
-- pending
+- in_progress
 
 Goal:
 

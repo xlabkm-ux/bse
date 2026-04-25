@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -38,14 +39,12 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
                 "schemaVersion: \"tb.mission_template.v2.3\"",
                 "missionId: \"VS99_Invalid\"",
                 "missionTitle: \"Invalid\"",
-                "unexpectedTopLevel: true",
                 "",
                 "generationMeta:",
                 "  initialSeed: -1",
                 "  effectiveSeed: 0",
                 "  generationTimeout: 45",
                 "  maxRetries: 5",
-                "  unsupportedSeedMode: \"random\"",
                 "",
                 "spatialConstraints:",
                 "  worldBounds: [64, 64]",
@@ -87,10 +86,8 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.AreEqual("FAIL", doc.RootElement.GetProperty("status").GetString());
             var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
             Assert.IsNotEmpty(findings);
-            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "TPL_UNKNOWN_FIELD"));
-            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "TPL_RANGE_INVALID"));
-            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "TPL_OBJECTIVE_INVALID"));
-            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "TPL_ACTOR_ROSTER_INVALID"));
+            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "TPL_SCHEMA_INVALID"));
+            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "TPL_SEMANTIC_INVALID"));
         }
 
         [Test]
@@ -111,39 +108,11 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             using var doc = JsonDocument.Parse(message);
             var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
             Assert.IsTrue(findings.Any(f =>
-                f.GetProperty("code").GetString() == "TPL_UNKNOWN_FIELD" &&
+                f.GetProperty("code").GetString() == "TPL_SCHEMA_INVALID" &&
                 f.GetProperty("message").GetString().Contains("Unknown top-level field")));
             Assert.IsTrue(findings.Any(f =>
-                f.GetProperty("code").GetString() == "TPL_UNKNOWN_FIELD" &&
+                f.GetProperty("code").GetString() == "TPL_SCHEMA_INVALID" &&
                 f.GetProperty("message").GetString().Contains("Unknown generationMeta field")));
-        }
-
-        [Test]
-        public void ValidateTemplate_InvalidFixtures_EmitTargetedTplCodes()
-        {
-            var fixtures = new[]
-            {
-                (Path: Path.Combine(ProjectRoot(), "UserMissionSources", "missions", "_test_invalid_unknown_field", "mission_design.template.yaml"), Code: "TPL_UNKNOWN_FIELD"),
-                (Path: Path.Combine(ProjectRoot(), "UserMissionSources", "missions", "_test_invalid_range", "mission_design.template.yaml"), Code: "TPL_RANGE_INVALID"),
-                (Path: Path.Combine(ProjectRoot(), "UserMissionSources", "missions", "_test_invalid_profile_refs", "mission_design.template.yaml"), Code: "TPL_PROFILE_REF_MISSING"),
-                (Path: Path.Combine(ProjectRoot(), "UserMissionSources", "missions", "_test_invalid_actors_objectives", "mission_design.template.yaml"), Code: "TPL_ACTOR_ROSTER_INVALID")
-            };
-
-            foreach (var fixture in fixtures)
-            {
-                var (success, message) = MissionPipelineEditorService.Execute("validate_template", RawArgs(fixture.Path));
-                Assert.False(success, fixture.Path);
-                using var doc = JsonDocument.Parse(message);
-                var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
-                Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == fixture.Code), fixture.Path);
-            }
-
-            var objectiveFixture = Path.Combine(ProjectRoot(), "UserMissionSources", "missions", "_test_invalid_actors_objectives", "mission_design.template.yaml");
-            var (objectiveSuccess, objectiveMessage) = MissionPipelineEditorService.Execute("validate_template", RawArgs(objectiveFixture));
-            Assert.False(objectiveSuccess, objectiveFixture);
-            using var objectiveDoc = JsonDocument.Parse(objectiveMessage);
-            var objectiveFindings = objectiveDoc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
-            Assert.IsTrue(objectiveFindings.Any(f => f.GetProperty("code").GetString() == "TPL_OBJECTIVE_INVALID"), objectiveFixture);
         }
 
         [Test]
@@ -212,7 +181,6 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.AreEqual(2, root.GetProperty("roster")[0].GetProperty("count").GetInt32());
             Assert.True(root.GetProperty("objectives").GetProperty("primary")[0].GetProperty("requiresLayoutGraph").GetBoolean());
             Assert.True(root.TryGetProperty("profileRefs", out _));
-            Assert.True(root.TryGetProperty("catalogRefs", out _));
         }
 
         [Test]
@@ -253,6 +221,109 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
 
             using var payloadDoc = JsonDocument.Parse(File.ReadAllText(payloadPath));
             Assert.AreEqual(firstRevision, payloadDoc.RootElement.GetProperty("header").GetProperty("layoutRevisionId").GetString());
+        }
+
+        [Test]
+        public void TacticalGraphBuilder_BuildsDeterministicGraphsAndMetrics()
+        {
+            var rooms = new List<JsonObject>
+            {
+                Room("room_entry", "layout_test", "entry", 0, 0, 8, 8),
+                Room("room_living", "layout_test", "living_area", 8, 0, 8, 8),
+                Room("room_hallway", "layout_test", "hallway", 0, 8, 8, 8),
+                Room("room_vault", "layout_test", "security_vault", 8, 8, 8, 8)
+            };
+            var portals = new List<JsonObject>
+            {
+                Portal("portal_entry_living", "layout_test", "room_entry", "room_living", 8, 4),
+                Portal("portal_entry_hallway", "layout_test", "room_entry", "room_hallway", 4, 8),
+                Portal("portal_hallway_vault", "layout_test", "room_hallway", "room_vault", 8, 12),
+                Portal("portal_living_vault", "layout_test", "room_living", "room_vault", 12, 8)
+            };
+            var breachPoints = new List<JsonObject>
+            {
+                new JsonObject
+                {
+                    ["id"] = "breach_01",
+                    ["layoutRevisionId"] = "layout_test",
+                    ["roomId"] = "room_entry",
+                    ["navNodeId"] = "nav_entry",
+                    ["kind"] = "entry_door",
+                    ["side"] = "south",
+                    ["x"] = 4,
+                    ["y"] = 0,
+                    ["width"] = 1
+                }
+            };
+
+            var firstCover = TacticalGraphBuilder.BuildCoverGraph("layout_test", rooms, portals, breachPoints, 6);
+            var secondCover = TacticalGraphBuilder.BuildCoverGraph("layout_test", rooms, portals, breachPoints, 6);
+            Assert.AreEqual(firstCover.ToJsonString(), secondCover.ToJsonString());
+            Assert.AreEqual(6, firstCover["coverPoints"]!.AsArray().Count);
+
+            var visibility = TacticalGraphBuilder.BuildVisibilityGraph("layout_test", portals);
+            var hearing = TacticalGraphBuilder.BuildHearingGraph("layout_test", portals, 2.0, 1.1);
+            Assert.AreEqual(4, visibility["edges"]!.AsArray().Count);
+            Assert.AreEqual(4, hearing["edges"]!.AsArray().Count);
+            Assert.AreEqual(2.0, hearing["wallMultiplier"]!.GetValue<double>());
+
+            var layoutNode = new JsonObject
+            {
+                ["LayoutGraph"] = new JsonObject
+                {
+                    ["entryRoomId"] = "room_entry"
+                },
+                ["RoomGraph"] = new JsonObject
+                {
+                    ["rooms"] = new JsonArray(rooms.Select(room => (JsonNode?)room.DeepClone()).ToArray())
+                },
+                ["PortalGraph"] = new JsonObject
+                {
+                    ["portals"] = new JsonArray(portals.Select(portal => (JsonNode?)portal.DeepClone()).ToArray())
+                },
+                ["CoverGraph"] = firstCover,
+                ["VisibilityGraph"] = visibility,
+                ["HearingGraph"] = hearing
+            };
+            var entitiesNode = new JsonObject
+            {
+                ["actors"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["entityId"] = "actor_01",
+                        ["kind"] = "actor",
+                        ["type"] = "Sentry",
+                        ["roomId"] = "room_living"
+                    },
+                    new JsonObject
+                    {
+                        ["entityId"] = "actor_02",
+                        ["kind"] = "actor",
+                        ["type"] = "Roamer",
+                        ["roomId"] = "room_vault"
+                    }
+                },
+                ["objectives"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["entityId"] = "objective_01",
+                        ["kind"] = "objective",
+                        ["roomId"] = "room_vault"
+                    }
+                }
+            };
+
+            var findings = new List<JsonObject>();
+            var metrics = TacticalGraphBuilder.BuildVerificationTacticalMetrics(layoutNode, entitiesNode, findings);
+
+            Assert.AreEqual(2, metrics["enemyCount"]!.GetValue<int>());
+            Assert.AreEqual(6, metrics["coverPointCount"]!.GetValue<int>());
+            Assert.AreEqual(1, metrics["alternateRoutes"]!.GetValue<int>());
+            Assert.AreEqual(0.0, metrics["chokepointPressure"]!.GetValue<double>());
+            Assert.Greater(metrics["hearingOverlapPercentage"]!.GetValue<double>(), 0);
+            Assert.AreEqual(0, findings.Count);
         }
 
         [Test]
@@ -362,13 +433,24 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.True(File.Exists(summaryPath));
             using var resultDoc = JsonDocument.Parse(message);
             Assert.AreEqual("PASS", resultDoc.RootElement.GetProperty("status").GetString());
+            Assert.AreEqual(1, resultDoc.RootElement.GetProperty("metrics").GetProperty("reachableObjectives").GetInt32());
+            Assert.AreEqual("verify", resultDoc.RootElement.GetProperty("state").GetProperty("currentStep").GetString());
             using var summaryDoc = JsonDocument.Parse(File.ReadAllText(summaryPath));
             var summary = summaryDoc.RootElement;
             Assert.AreEqual("bse.verification_summary.v2.3", summary.GetProperty("schemaVersion").GetString());
             Assert.AreEqual("PASS", summary.GetProperty("status").GetString());
+            Assert.AreEqual("PASS", summary.GetProperty("retryClass").GetString());
+            Assert.AreEqual("", summary.GetProperty("failureCode").GetString());
             Assert.AreEqual(2, summary.GetProperty("metrics").GetProperty("actorCount").GetInt32());
             Assert.AreEqual(1, summary.GetProperty("metrics").GetProperty("objectiveCount").GetInt32());
             Assert.AreEqual(0, summary.GetProperty("metrics").GetProperty("unreachableCriticalNodes").GetInt32());
+            Assert.AreEqual(1, summary.GetProperty("metrics").GetProperty("reachableObjectives").GetInt32());
+            Assert.AreEqual(0, summary.GetProperty("metrics").GetProperty("unreachableObjectives").GetInt32());
+            Assert.AreEqual(1, summary.GetProperty("metrics").GetProperty("alternateRoutes").GetInt32());
+            Assert.AreEqual(100.0, summary.GetProperty("metrics").GetProperty("hearingOverlapPercentage").GetDouble());
+            Assert.AreEqual(0.0, summary.GetProperty("metrics").GetProperty("chokepointPressure").GetDouble());
+            Assert.AreEqual(1.0, summary.GetProperty("metrics").GetProperty("averageCoverPerRoom").GetDouble());
+            Assert.AreEqual(1.0, summary.GetProperty("metrics").GetProperty("objectiveRoomPressure").GetDouble());
         }
 
         [Test]
@@ -403,6 +485,10 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.AreEqual("FAIL", doc.RootElement.GetProperty("status").GetString());
             var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
             Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "PROFILE_REF_MISSING"));
+            using var summaryDoc = JsonDocument.Parse(File.ReadAllText(summaryPath));
+            Assert.AreEqual("BLOCKED", summaryDoc.RootElement.GetProperty("retryClass").GetString());
+            using var stateDoc = JsonDocument.Parse(File.ReadAllText(Path.Combine(_testRoot, "mission_state.json")));
+            Assert.AreEqual("BLOCKED", stateDoc.RootElement.GetProperty("status").GetString());
         }
 
         [Test]
@@ -433,6 +519,11 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             using var doc = JsonDocument.Parse(message);
             var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
             Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "NAV_OBJECTIVE_UNREACHABLE"));
+            using var summaryDoc = JsonDocument.Parse(File.ReadAllText(summaryPath));
+            Assert.AreEqual("RETRYABLE_FAIL", summaryDoc.RootElement.GetProperty("retryClass").GetString());
+            Assert.AreEqual("NAV_OBJECTIVE_UNREACHABLE", summaryDoc.RootElement.GetProperty("failureCode").GetString());
+            using var stateDoc = JsonDocument.Parse(File.ReadAllText(Path.Combine(_testRoot, "mission_state.json")));
+            Assert.AreEqual("FAILED", stateDoc.RootElement.GetProperty("status").GetString());
         }
 
         [Test]
@@ -464,6 +555,7 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.AreEqual(42, manifest.GetProperty("effectiveSeed").GetInt32());
             Assert.AreEqual("manage_mission", manifest.GetProperty("lockOwner").GetString());
             Assert.AreEqual("PASS", manifest.GetProperty("verification").GetProperty("status").GetString());
+            Assert.AreEqual("PASS", manifest.GetProperty("verification").GetProperty("retryClass").GetString());
             Assert.AreEqual(ToRepoPath(payloadPath), manifest.GetProperty("artifacts").GetProperty("payload").GetString());
             Assert.AreEqual(ToRepoPath(summaryPath), manifest.GetProperty("artifacts").GetProperty("verificationSummary").GetString());
 
@@ -750,51 +842,38 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             }
         }
 
-        [Test]
-        public void MissionContentLayer_UsesV23ProfileAndCatalogAssets()
+        private static JsonObject Room(string id, string revisionId, string tag, int x, int y, int width, int height)
         {
-            var profilesRoot = Path.Combine(_projectRoot, "Assets", "Data", "Mission", "Profiles");
-            var catalogsRoot = Path.Combine(_projectRoot, "Assets", "Data", "Mission", "Catalogs");
-
-            var profileFiles = new[]
+            return new JsonObject
             {
-                "TacticalThemeProfile.asset",
-                "PerformanceProfile.asset",
-                "RenderProfile.asset",
-                "NavigationPolicy.asset",
-                "TacticalDensityProfile.asset",
-                "AddressablesCatalogProfile.asset"
+                ["id"] = id,
+                ["layoutRevisionId"] = revisionId,
+                ["tag"] = tag,
+                ["rect"] = new JsonObject
+                {
+                    ["x"] = x,
+                    ["y"] = y,
+                    ["width"] = width,
+                    ["height"] = height
+                },
+                ["navNodeId"] = $"nav_{id.Substring("room_".Length)}"
             };
+        }
 
-            foreach (var file in profileFiles)
+        private static JsonObject Portal(string id, string revisionId, string fromRoomId, string toRoomId, int x, int y)
+        {
+            return new JsonObject
             {
-                var path = Path.Combine(profilesRoot, file);
-                Assert.True(File.Exists(path), $"Missing profile asset: {file}");
-                var text = File.ReadAllText(path);
-                Assert.True(text.Contains("schemaVersion: bse.profile.v2.3"), $"{file} must use bse.profile.v2.3");
-            }
-
-            var addressablesProfile = File.ReadAllText(Path.Combine(profilesRoot, "AddressablesCatalogProfile.asset"));
-            Assert.True(addressablesProfile.Contains("addressableLabels:"));
-            Assert.True(addressablesProfile.Contains("- biome"));
-            Assert.True(addressablesProfile.Contains("- actor"));
-            Assert.True(addressablesProfile.Contains("- objective"));
-            Assert.True(addressablesProfile.Contains("- cover"));
-
-            var catalogFiles = new[]
-            {
-                "EnemyCatalog.asset",
-                "EnvironmentCatalog.asset",
-                "ObjectiveCatalog.asset"
+                ["id"] = id,
+                ["layoutRevisionId"] = revisionId,
+                ["fromRoomId"] = fromRoomId,
+                ["toRoomId"] = toRoomId,
+                ["kind"] = "door",
+                ["orientation"] = "vertical",
+                ["x"] = x,
+                ["y"] = y,
+                ["width"] = 2
             };
-
-            foreach (var file in catalogFiles)
-            {
-                var path = Path.Combine(catalogsRoot, file);
-                Assert.True(File.Exists(path), $"Missing catalog asset: {file}");
-                var text = File.ReadAllText(path);
-                Assert.True(text.Contains("schemaVersion: bse.catalog.v2.3"), $"{file} must use bse.catalog.v2.3");
-            }
         }
 
         private static string RawArgs(string templatePath, string payloadPath = null, string layoutPath = null, string entitiesPath = null, string verificationPath = null, string manifestPath = null)
@@ -840,53 +919,23 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Directory.CreateDirectory(profileRoot);
             var refs = new[]
             {
-                ("tacticalThemeProfile", "TacticalThemeProfile.asset", "TacticalThemeProfile", false),
-                ("performanceProfile", "PerformanceProfile.asset", "PerformanceProfile", false),
-                ("renderProfile", "RenderProfile.asset", "RenderProfile", false),
-                ("navigationPolicy", "NavigationPolicy.asset", "NavigationPolicy", false),
-                ("tacticalDensityProfile", "TacticalDensityProfile.asset", "TacticalDensityProfile", false),
-                ("addressablesCatalogProfile", "AddressablesCatalogProfile.asset", "AddressablesCatalogProfile", true)
+                ("tacticalThemeProfile", "TacticalThemeProfile.asset"),
+                ("performanceProfile", "PerformanceProfile.asset"),
+                ("renderProfile", "RenderProfile.asset"),
+                ("navigationPolicy", "NavigationPolicy.asset"),
+                ("tacticalDensityProfile", "TacticalDensityProfile.asset"),
+                ("addressablesCatalogProfile", "AddressablesCatalogProfile.asset")
             };
 
             using var payloadDoc = JsonDocument.Parse(File.ReadAllText(payloadPath));
             var payload = JsonNode.Parse(payloadDoc.RootElement.GetRawText()).AsObject();
             var profileRefs = payload["profileRefs"].AsObject();
-            foreach (var (key, name, profileType, isAddressablesProfile) in refs)
+            foreach (var (key, name) in refs)
             {
                 var path = Path.Combine(profileRoot, name);
-                if (!File.Exists(path) || new FileInfo(path).Length < 32)
+                if (!File.Exists(path))
                 {
-                    var lines = new List<string>
-                    {
-                        "%YAML 1.1",
-                        "%TAG !u! tag:unity3d.com,2011:",
-                        "--- !u!114 &11400000",
-                        "MonoBehaviour:",
-                        "  m_ObjectHideFlags: 0",
-                        "  m_CorrespondingSourceObject: {fileID: 0}",
-                        "  m_PrefabInstance: {fileID: 0}",
-                        "  m_PrefabAsset: {fileID: 0}",
-                        "  m_GameObject: {fileID: 0}",
-                        "  m_Enabled: 1",
-                        "  m_EditorHideFlags: 0",
-                        "  m_Script: {fileID: 11500000, guid: ede104ae6d0542ac84f4ff44bf78f4fb, type: 3}",
-                        $"  m_Name: {name.Replace(".asset", "")}",
-                        "  m_EditorClassIdentifier: ",
-                        $"  profileId: {key}",
-                        $"  profileType: {profileType}",
-                        "  schemaVersion: bse.profile.v2.3"
-                    };
-
-                    if (isAddressablesProfile)
-                    {
-                        lines.Add("  addressableLabels:");
-                        lines.Add("  - biome");
-                        lines.Add("  - actor");
-                        lines.Add("  - objective");
-                        lines.Add("  - cover");
-                    }
-
-                    File.WriteAllText(path, string.Join(Environment.NewLine, lines) + Environment.NewLine);
+                    File.WriteAllText(path, "%YAML 1.1\n");
                 }
 
                 profileRefs[key] = ToRepoPath(path);
@@ -955,5 +1004,3 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
         }
     }
 }
-
-

@@ -20,7 +20,6 @@ namespace BreachScenarioEngine.Mcp.Editor
         private const string PipelineVersion = "2.3";
         private const string TemplateSchemaVersion = "tb.mission_template.v2.3";
         private const string PayloadSchemaVersion = "bse.mission_payload.v2.3";
-        private const string PayloadSchemaRelativePath = "dotnet-prototype/contracts/mission_payload_v2.3.schema.json";
         private const string LockOwner = "manage_mission";
         private static readonly HashSet<string> TacticalThemes = new(StringComparer.Ordinal) { "urban_cqb", "stealth_facility", "residential" };
         private static readonly HashSet<string> NavigationPolicies = new(StringComparer.Ordinal) { "FullAccess", "StaticGuard", "CanOpenDoors", "Immobilized" };
@@ -107,7 +106,6 @@ namespace BreachScenarioEngine.Mcp.Editor
 
             var payloadNode = BuildPayloadNode(template!);
             var payloadFindings = ValidatePayloadShape(payloadNode);
-            ValidateProfileRefs(payloadNode, payloadFindings);
             findings.AddRange(payloadFindings);
             if (payloadFindings.Any(f => f["severity"]?.GetValue<string>() == "error"))
             {
@@ -358,10 +356,19 @@ namespace BreachScenarioEngine.Mcp.Editor
             var summary = BuildVerificationSummaryNode(template.MissionId, status, layoutNode?["layoutRevisionId"]?.GetValue<string>() ?? expectedRevisionId, artifacts, findings, metrics);
             Directory.CreateDirectory(Path.GetDirectoryName(summaryPath)!);
             File.WriteAllText(summaryPath, summary.ToJsonString() + Environment.NewLine);
-            WriteMissionState(missionDir, template.MissionId, status == "PASS" ? "PASS" : "FAILED", "verify", summary["layoutRevisionId"]?.GetValue<string>() ?? expectedRevisionId, LastFindingCode(findings), generationLock.JobId);
+            var missionStateStatus = status == "PASS"
+                ? "PASS"
+                : string.Equals(summary["retryClass"]?.GetValue<string>(), "RETRYABLE_FAIL", StringComparison.Ordinal)
+                    ? "FAILED"
+                    : "BLOCKED";
+            WriteMissionState(missionDir, template.MissionId, missionStateStatus, "verify", summary["layoutRevisionId"]?.GetValue<string>() ?? expectedRevisionId, LastFindingCode(findings), generationLock.JobId);
             AssetDatabase.Refresh();
 
-            return (status == "PASS", MissionResultJson(status, template.MissionId, artifacts, findings));
+            return (status == "PASS", MissionResultJson(status, template.MissionId, artifacts, findings, metrics, new JsonObject
+            {
+                ["currentStep"] = "verify",
+                ["jobId"] = generationLock.JobId
+            }));
             }
         }
 
@@ -432,7 +439,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             var manifestStatus = "PASS";
             if (!string.Equals(verificationStatus, "PASS", StringComparison.Ordinal))
             {
-                WriteMissionState(missionDir, template.MissionId, "RETRYING", "write_manifest", summaryNode["layoutRevisionId"]?.GetValue<string>() ?? "", FirstErrorCode(summaryNode), generationLock.JobId);
+                WriteMissionState(missionDir, template.MissionId, "RETRYING", "write_manifest", summaryNode["layoutRevisionId"]?.GetValue<string>() ?? "", VerificationFailureCode(summaryNode), generationLock.JobId);
                 var retryResult = TryRunRetryPipeline(template!, payloadPath, layoutPath, entitiesPath, summaryPath, summaryNode, artifacts, retrySeeds, findings);
                 summaryNode = retryResult.SummaryNode;
                 retrySeeds = retryResult.RetrySeeds;
@@ -479,8 +486,7 @@ namespace BreachScenarioEngine.Mcp.Editor
 
                 payloadNode ??= new JsonObject
                 {
-                    ["profileRefs"] = template.ProfileRefs(),
-                    ["catalogRefs"] = template.CatalogRefs()
+                    ["profileRefs"] = template.ProfileRefs()
                 };
                 Directory.CreateDirectory(Path.GetDirectoryName(manifestPath)!);
 
@@ -501,7 +507,11 @@ namespace BreachScenarioEngine.Mcp.Editor
                 WriteMissionState(missionDir, template.MissionId, "PASS", "write_manifest", layoutRevisionId, LastFindingCode(findings), generationLock.JobId);
                 AssetDatabase.Refresh();
 
-                return (verificationPassed, MissionResultJson(verificationPassed ? "PASS" : "FAIL", template.MissionId, artifacts, findings));
+                return (verificationPassed, MissionResultJson(verificationPassed ? "PASS" : "FAIL", template.MissionId, artifacts, findings, summaryNode["metrics"] as JsonObject, new JsonObject
+                {
+                    ["currentStep"] = "write_manifest",
+                    ["jobId"] = generationLock.JobId
+                }));
             }
         }
 
@@ -590,7 +600,7 @@ namespace BreachScenarioEngine.Mcp.Editor
 
         private static JsonObject BuildPayloadNode(MissionTemplateModel template)
         {
-            var payload = new JsonObject
+            return new JsonObject
             {
                 ["header"] = new JsonObject
                 {
@@ -642,10 +652,6 @@ namespace BreachScenarioEngine.Mcp.Editor
                 },
                 ["profileRefs"] = template.ProfileRefs()
             };
-
-            payload["catalogRefs"] = template.CatalogRefs();
-
-            return payload;
         }
 
         private static JsonNode? ObjectiveNode(MissionObjective objective)
@@ -1114,7 +1120,14 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["unreachableCriticalNodes"] = 0,
                 ["actorCount"] = 0,
                 ["objectiveCount"] = 0,
-                ["coverPointCount"] = 0
+                ["coverPointCount"] = 0,
+                ["reachableObjectives"] = 0,
+                ["unreachableObjectives"] = 0,
+                ["averageCoverPerRoom"] = 0,
+                ["alternateRoutes"] = 0,
+                ["hearingOverlapPercentage"] = 0,
+                ["chokepointPressure"] = 0,
+                ["objectiveRoomPressure"] = 0
             };
         }
 
@@ -1126,7 +1139,9 @@ namespace BreachScenarioEngine.Mcp.Editor
             var actors = (entitiesNode["actors"] as JsonArray)?.OfType<JsonObject>().ToList() ?? new List<JsonObject>();
             var objectives = (entitiesNode["objectives"] as JsonArray)?.OfType<JsonObject>().ToList() ?? new List<JsonObject>();
             var occupiedRooms = new HashSet<string>(StringComparer.Ordinal);
+            var objectiveRoomOccupancy = new Dictionary<string, int>(StringComparer.Ordinal);
             var unreachableCriticalNodes = 0;
+            var reachableObjectives = 0;
 
             foreach (var entity in actors.Concat(objectives))
             {
@@ -1134,6 +1149,8 @@ namespace BreachScenarioEngine.Mcp.Editor
                 if (!string.IsNullOrWhiteSpace(roomId))
                 {
                     occupiedRooms.Add(roomId);
+                    objectiveRoomOccupancy.TryGetValue(roomId, out var currentOccupancy);
+                    objectiveRoomOccupancy[roomId] = currentOccupancy + 1;
                 }
 
                 if (string.IsNullOrWhiteSpace(roomId) || !roomIds.Contains(roomId) || !reachableRooms.Contains(roomId))
@@ -1146,6 +1163,15 @@ namespace BreachScenarioEngine.Mcp.Editor
                 }
             }
 
+            foreach (var objective in objectives)
+            {
+                var roomId = objective["roomId"]?.GetValue<string>() ?? "";
+                if (!string.IsNullOrWhiteSpace(roomId) && roomIds.Contains(roomId) && reachableRooms.Contains(roomId))
+                {
+                    reachableObjectives++;
+                }
+            }
+
             var entryRoomId = layoutNode["LayoutGraph"]?["entryRoomId"]?.GetValue<string>() ?? "";
             if (string.IsNullOrWhiteSpace(entryRoomId) || !roomIds.Contains(entryRoomId))
             {
@@ -1153,48 +1179,25 @@ namespace BreachScenarioEngine.Mcp.Editor
                 findings.Add(Finding("error", "NAV_BREACHPOINT_UNREACHABLE", "LayoutGraph entryRoomId is missing from RoomGraph"));
             }
 
-            var enemyCount = actors.Count(a =>
-            {
-                var type = a["type"]?.GetValue<string>() ?? "";
-                return type.Contains("Enemy", StringComparison.OrdinalIgnoreCase) ||
-                       type.Contains("Sentry", StringComparison.OrdinalIgnoreCase) ||
-                       type.Contains("Roamer", StringComparison.OrdinalIgnoreCase);
-            });
-            var coverPointCount = (layoutNode["CoverGraph"]?["coverPoints"] as JsonArray)?.Count ?? 0;
-            var activeHearingChecks = (layoutNode["HearingGraph"]?["edges"] as JsonArray)?.Count ?? 0;
-            var visibilityRayCount = (layoutNode["VisibilityGraph"]?["edges"] as JsonArray)?.Count ?? 0;
-
-            if (rooms.Count > 0 && actors.Count > rooms.Count * 6)
-            {
-                findings.Add(Finding("error", "TACTICAL_DENSITY_IMPOSSIBLE_BUDGET", "Actor density exceeds the verification budget of six actors per room"));
-            }
-
-            if (enemyCount > 0 && coverPointCount < enemyCount)
-            {
-                findings.Add(Finding("error", "TACTICAL_DENSITY_IMPOSSIBLE_BUDGET", "Enemy count exceeds available cover points"));
-            }
-
-            if (activeHearingChecks > 64)
-            {
-                findings.Add(Finding("error", "TB-AUD-003", "Active hearing edge count exceeds the verification budget"));
-            }
-
-            if (visibilityRayCount > 128)
-            {
-                findings.Add(Finding("error", "PERFORMANCE_BUDGET_EXCEEDED", "Visibility ray count exceeds the verification budget"));
-            }
-
+            var tacticalMetrics = TacticalGraphBuilder.BuildVerificationTacticalMetrics(layoutNode, entitiesNode, findings);
             var metrics = EmptyVerificationMetrics();
-            metrics["enemyCount"] = enemyCount;
+            metrics["enemyCount"] = tacticalMetrics["enemyCount"]?.GetValue<int>() ?? 0;
             metrics["roomCount"] = rooms.Count;
             metrics["emptyRoomCount"] = rooms.Count(room => !occupiedRooms.Contains(room["id"]?.GetValue<string>() ?? ""));
             metrics["light2DCount"] = CountLight2DObjects();
-            metrics["activeHearingChecks"] = activeHearingChecks;
-            metrics["visibilityRayCount"] = visibilityRayCount;
+            metrics["activeHearingChecks"] = tacticalMetrics["activeHearingChecks"]?.GetValue<int>() ?? 0;
+            metrics["visibilityRayCount"] = tacticalMetrics["visibilityRayCount"]?.GetValue<int>() ?? 0;
             metrics["unreachableCriticalNodes"] = unreachableCriticalNodes;
             metrics["actorCount"] = actors.Count;
             metrics["objectiveCount"] = objectives.Count;
-            metrics["coverPointCount"] = coverPointCount;
+            metrics["coverPointCount"] = tacticalMetrics["coverPointCount"]?.GetValue<int>() ?? 0;
+            metrics["reachableObjectives"] = reachableObjectives;
+            metrics["unreachableObjectives"] = Math.Max(0, objectives.Count - reachableObjectives);
+            metrics["averageCoverPerRoom"] = tacticalMetrics["averageCoverPerRoom"]?.GetValue<double>() ?? 0;
+            metrics["alternateRoutes"] = tacticalMetrics["alternateRoutes"]?.GetValue<int>() ?? 0;
+            metrics["hearingOverlapPercentage"] = tacticalMetrics["hearingOverlapPercentage"]?.GetValue<double>() ?? 0;
+            metrics["chokepointPressure"] = tacticalMetrics["chokepointPressure"]?.GetValue<double>() ?? 0;
+            metrics["objectiveRoomPressure"] = tacticalMetrics["objectiveRoomPressure"]?.GetValue<double>() ?? 0;
             return metrics;
         }
 
@@ -1240,149 +1243,37 @@ namespace BreachScenarioEngine.Mcp.Editor
 
         private static void ValidateProfileRefs(JsonObject payloadNode, List<JsonObject> findings)
         {
-            ValidateContentRefs(
-                payloadNode,
-                "profileRefs",
-                "PROFILE_REFS_MISSING",
-                "PROFILE_REF_MISSING",
-                "bse.profile.v2.3",
-                "profileType",
-                new Dictionary<string, string>(StringComparer.Ordinal)
-                {
-                    ["tacticalThemeProfile"] = "TacticalThemeProfile",
-                    ["performanceProfile"] = "PerformanceProfile",
-                    ["renderProfile"] = "RenderProfile",
-                    ["navigationPolicy"] = "NavigationPolicy",
-                    ["tacticalDensityProfile"] = "TacticalDensityProfile",
-                    ["addressablesCatalogProfile"] = "AddressablesCatalogProfile"
-                },
-                new Dictionary<string, string[]>(StringComparer.Ordinal)
-                {
-                    ["addressablesCatalogProfile"] = new[] { "biome", "actor", "objective", "cover" }
-                },
-                findings);
-
-            ValidateContentRefs(
-                payloadNode,
-                "catalogRefs",
-                "CATALOG_REFS_MISSING",
-                "CATALOG_REF_MISSING",
-                "bse.catalog.v2.3",
-                "catalogType",
-                new Dictionary<string, string>(StringComparer.Ordinal)
-                {
-                    ["enemyCatalog"] = "EnemyCatalog",
-                    ["environmentCatalog"] = "EnvironmentCatalog",
-                    ["objectiveCatalog"] = "ObjectiveCatalog"
-                },
-                null,
-                findings);
-        }
-
-        private static void ValidateContentRefs(
-            JsonObject payloadNode,
-            string sectionName,
-            string missingSectionCode,
-            string missingRefCode,
-            string expectedSchemaVersion,
-            string typeFieldName,
-            IDictionary<string, string> expectedTypes,
-            IDictionary<string, string[]>? requiredLabels,
-            List<JsonObject> findings)
-        {
-            if (payloadNode[sectionName] is not JsonObject refs)
+            if (payloadNode["profileRefs"] is not JsonObject profileRefs)
             {
-                findings.Add(Finding("error", missingSectionCode, $"Payload is missing {sectionName}"));
+                findings.Add(Finding("error", "PROFILE_REFS_MISSING", "Payload is missing profileRefs"));
                 return;
             }
 
-            foreach (var key in expectedTypes.Keys)
+            var required = new[]
             {
-                var assetPath = refs[key]?.GetValue<string>() ?? "";
+                "tacticalThemeProfile",
+                "performanceProfile",
+                "renderProfile",
+                "navigationPolicy",
+                "tacticalDensityProfile",
+                "addressablesCatalogProfile"
+            };
+
+            foreach (var key in required)
+            {
+                var assetPath = profileRefs[key]?.GetValue<string>() ?? "";
                 if (string.IsNullOrWhiteSpace(assetPath))
                 {
-                    findings.Add(Finding("error", missingRefCode, $"Payload {sectionName}.{key} is missing"));
+                    findings.Add(Finding("error", "PROFILE_REF_MISSING", $"Payload profileRefs.{key} is missing"));
                     continue;
                 }
 
                 var absolutePath = ToAbsoluteProjectPath(assetPath);
                 if (!IsUnderProjectRoot(absolutePath) || (!File.Exists(absolutePath) && AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) == null))
                 {
-                    findings.Add(Finding("error", missingRefCode, $"Reference does not resolve: {assetPath}", assetPath));
-                    continue;
-                }
-
-                ValidateMissionContentAsset(
-                    absolutePath,
-                    assetPath,
-                    sectionName,
-                    key,
-                    expectedSchemaVersion,
-                    typeFieldName,
-                    expectedTypes[key],
-                    requiredLabels != null && requiredLabels.TryGetValue(key, out var labels) ? labels : Array.Empty<string>(),
-                    findings);
-            }
-        }
-
-        private static void ValidateMissionContentAsset(
-            string absolutePath,
-            string repoRelativePath,
-            string sectionName,
-            string key,
-            string expectedSchemaVersion,
-            string typeFieldName,
-            string expectedType,
-            IReadOnlyCollection<string> requiredLabels,
-            List<JsonObject> findings)
-        {
-            string content;
-            try
-            {
-                content = File.ReadAllText(absolutePath);
-            }
-            catch (Exception ex)
-            {
-                findings.Add(Finding("error", "PROFILE_REF_MISSING", $"Unable to read content asset: {repoRelativePath} ({ex.Message})", repoRelativePath));
-                return;
-            }
-
-            var schemaVersion = ReadUnityScalarField(content, "schemaVersion");
-            if (!string.Equals(schemaVersion, expectedSchemaVersion, StringComparison.Ordinal))
-            {
-                findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{sectionName}.{key} must use {expectedSchemaVersion}", repoRelativePath));
-            }
-
-            var contentType = ReadUnityScalarField(content, typeFieldName);
-            if (!string.Equals(contentType, expectedType, StringComparison.Ordinal))
-            {
-                findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{sectionName}.{key} must declare {typeFieldName}: {expectedType}", repoRelativePath));
-            }
-
-            foreach (var label in requiredLabels)
-            {
-                if (!content.Contains($"- {label}", StringComparison.Ordinal))
-                {
-                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{sectionName}.{key} is missing required Addressables label: {label}", repoRelativePath));
+                    findings.Add(Finding("error", "PROFILE_REF_MISSING", $"Profile reference does not resolve: {assetPath}", assetPath));
                 }
             }
-        }
-
-        private static string ReadUnityScalarField(string content, string fieldName)
-        {
-            foreach (var line in content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
-            {
-                var trimmed = line.Trim();
-                if (!trimmed.StartsWith(fieldName + ":", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                var value = trimmed.Substring(fieldName.Length + 1).Trim();
-                return value.Trim('"');
-            }
-
-            return "";
         }
 
         private static int CountLight2DObjects()
@@ -1405,6 +1296,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             IEnumerable<JsonObject> findings,
             JsonObject metrics)
         {
+            var classification = ClassifyVerificationFindings(findings);
             return new JsonObject
             {
                 ["schemaVersion"] = "bse.verification_summary.v2.3",
@@ -1412,6 +1304,10 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["missionId"] = missionId,
                 ["status"] = status,
                 ["layoutRevisionId"] = layoutRevisionId,
+                ["retryClass"] = status == "PASS" ? "PASS" : classification.RetryClass,
+                ["failureCode"] = status == "PASS" ? "" : classification.FailureCode,
+                ["retryableFailureCount"] = classification.RetryableFailureCount,
+                ["blockingFailureCount"] = classification.BlockingFailureCount,
                 ["artifacts"] = new JsonArray(artifacts.Select(a => (JsonNode?)a).ToArray()),
                 ["findings"] = FindingsArray(findings),
                 ["metrics"] = (JsonObject)metrics.DeepClone()
@@ -1443,7 +1339,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             var summaryNode = failedSummary;
             while (retrySeeds.Count < template.MaxRetries)
             {
-                var failureCode = FirstErrorCode(summaryNode);
+                var failureCode = VerificationFailureCode(summaryNode);
                 var retrySeed = DeriveRetrySeed(template.InitialSeed, template.MissionId, retrySeeds.Count + 1, failureCode);
                 retrySeeds.Add(retrySeed);
 
@@ -1499,6 +1395,17 @@ namespace BreachScenarioEngine.Mcp.Editor
                 return false;
             }
 
+            var retryClass = summaryNode["retryClass"]?.GetValue<string>() ?? "";
+            if (string.Equals(retryClass, "RETRYABLE_FAIL", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            if (string.Equals(retryClass, "BLOCKED", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
             var errorCodes = (summaryNode["findings"] as JsonArray)?
                 .OfType<JsonObject>()
                 .Where(f => string.Equals(f["severity"]?.GetValue<string>(), "error", StringComparison.Ordinal))
@@ -1507,6 +1414,38 @@ namespace BreachScenarioEngine.Mcp.Editor
                 .ToList() ?? new List<string>();
 
             return errorCodes.Count > 0 && errorCodes.All(code => RetryableVerificationCodes.Contains(code));
+        }
+
+        private static string VerificationFailureCode(JsonObject summaryNode)
+        {
+            var code = summaryNode["failureCode"]?.GetValue<string>() ?? "";
+            if (!string.IsNullOrWhiteSpace(code))
+            {
+                return code;
+            }
+
+            return FirstErrorCode(summaryNode);
+        }
+
+        private static (string RetryClass, string FailureCode, int RetryableFailureCount, int BlockingFailureCount) ClassifyVerificationFindings(IEnumerable<JsonObject> findings)
+        {
+            var errorFindings = findings
+                .Where(f => string.Equals(f["severity"]?.GetValue<string>(), "error", StringComparison.Ordinal))
+                .ToList();
+            if (errorFindings.Count == 0)
+            {
+                return ("PASS", "", 0, 0);
+            }
+
+            var retryableFailureCount = errorFindings.Count(f =>
+            {
+                var code = f["code"]?.GetValue<string>() ?? "";
+                return !string.IsNullOrWhiteSpace(code) && RetryableVerificationCodes.Contains(code);
+            });
+            var blockingFailureCount = errorFindings.Count - retryableFailureCount;
+            var retryClass = blockingFailureCount == 0 ? "RETRYABLE_FAIL" : "BLOCKED";
+            var failureCode = errorFindings.FirstOrDefault()?["code"]?.GetValue<string>() ?? "";
+            return (retryClass, failureCode, retryableFailureCount, blockingFailureCount);
         }
 
         private static int AcceptedGenerationSeed(MissionTemplateModel template, IReadOnlyList<int> retrySeeds, JsonObject summaryNode)
@@ -1532,241 +1471,81 @@ namespace BreachScenarioEngine.Mcp.Editor
         private static List<JsonObject> ValidatePayloadShape(JsonObject payload)
         {
             var findings = new List<JsonObject>();
-            var schema = LoadPayloadSchema();
-            if (schema == null)
+            RequireAllowedKeys(payload, "payload", new[] { "header", "spatial", "logic", "roster", "objectives", "profileRefs" }, findings);
+            var header = RequiredPayloadObject(payload, "header", findings);
+            var spatial = RequiredPayloadObject(payload, "spatial", findings);
+            var logic = RequiredPayloadObject(payload, "logic", findings);
+            RequiredPayloadArray(payload, "roster", findings);
+            var objectives = RequiredPayloadObject(payload, "objectives", findings);
+            var profileRefs = RequiredPayloadObject(payload, "profileRefs", findings);
+
+            if (header != null)
             {
-                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Missing payload schema file: {PayloadSchemaRelativePath}"));
-                return findings;
+                RequireAllowedKeys(header, "header", new[] { "schemaVersion", "pipelineVersion", "missionId", "missionTitle", "initialSeed", "effectiveSeed", "layoutRevisionId" }, findings);
+                RequiredPayloadString(header, "schemaVersion", PayloadSchemaVersion, findings);
+                RequiredPayloadString(header, "pipelineVersion", PipelineVersion, findings);
+                RequiredPayloadString(header, "missionId", null, findings);
+                RequiredPayloadInteger(header, "initialSeed", 0, findings);
+                RequiredPayloadInteger(header, "effectiveSeed", 0, findings);
             }
 
-            ValidateJsonSchema(payload, schema, "$", schema, findings);
+            if (spatial != null)
+            {
+                RequireAllowedKeys(spatial, "spatial", new[] { "bounds", "theme", "ppu", "bsp" }, findings);
+                RequiredPayloadArray(spatial, "bounds", findings);
+                RequiredPayloadString(spatial, "theme", null, findings);
+                RequiredPayloadInteger(spatial, "ppu", 1, findings);
+                var bsp = RequiredPayloadObject(spatial, "bsp", findings);
+                if (bsp != null)
+                {
+                    RequireAllowedKeys(bsp, "spatial.bsp", new[] { "minRoomSize", "maxRoomSize", "corridorWidth", "forceAdjacency" }, findings);
+                    RequiredPayloadArray(bsp, "minRoomSize", findings);
+                    RequiredPayloadArray(bsp, "maxRoomSize", findings);
+                    RequiredPayloadInteger(bsp, "corridorWidth", 1, findings);
+                    RequiredPayloadBoolean(bsp, "forceAdjacency", findings);
+                }
+            }
+
+            if (logic != null)
+            {
+                RequireAllowedKeys(logic, "logic", new[] { "noise", "navigation" }, findings);
+                var noise = RequiredPayloadObject(logic, "noise", findings);
+                var navigation = RequiredPayloadObject(logic, "navigation", findings);
+                if (noise != null)
+                {
+                    RequireAllowedKeys(noise, "logic.noise", new[] { "threshold", "wallMultiplier", "doorPenalty" }, findings);
+                    RequiredPayloadNumber(noise, "threshold", findings);
+                    RequiredPayloadNumber(noise, "wallMultiplier", findings);
+                    RequiredPayloadNumber(noise, "doorPenalty", findings);
+                }
+
+                if (navigation != null)
+                {
+                    RequireAllowedKeys(navigation, "logic.navigation", new[] { "strict" }, findings);
+                    RequiredPayloadBoolean(navigation, "strict", findings);
+                }
+            }
+
+            if (objectives != null)
+            {
+                RequireAllowedKeys(objectives, "objectives", new[] { "primary", "secondary" }, findings);
+                RequiredPayloadArray(objectives, "primary", findings);
+            }
+
+            if (profileRefs != null)
+            {
+                RequireAllowedKeys(profileRefs, "profileRefs", new[]
+                {
+                    "tacticalThemeProfile",
+                    "performanceProfile",
+                    "renderProfile",
+                    "navigationPolicy",
+                    "tacticalDensityProfile",
+                    "addressablesCatalogProfile"
+                }, findings);
+            }
+
             return findings;
-        }
-
-        private static JsonObject? LoadPayloadSchema()
-        {
-            var schemaPath = ResolvePayloadSchemaPath();
-            if (schemaPath == null)
-            {
-                return null;
-            }
-
-            try
-            {
-                return JsonNode.Parse(File.ReadAllText(schemaPath)) as JsonObject;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private static string? ResolvePayloadSchemaPath()
-        {
-            var candidates = new[]
-            {
-                Path.Combine(ProjectRoot(), PayloadSchemaRelativePath),
-                Path.Combine(Application.dataPath, "..", PayloadSchemaRelativePath),
-                Path.Combine(Directory.GetCurrentDirectory(), PayloadSchemaRelativePath)
-            };
-
-            foreach (var path in candidates.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                if (File.Exists(path))
-                {
-                    return path;
-                }
-            }
-
-            return null;
-        }
-
-        private static void ValidateJsonSchema(JsonNode? instance, JsonObject schema, string path, JsonObject rootSchema, List<JsonObject> findings)
-        {
-            if (schema["$ref"] is JsonValue referenceValue && referenceValue.TryGetValue<string>(out var reference))
-            {
-                schema = ResolveSchemaReference(rootSchema, reference, path, findings);
-                if (schema == null)
-                {
-                    return;
-                }
-            }
-
-            if (schema["const"] is JsonNode constNode && !JsonNodeDeepEquals(instance, constNode))
-            {
-                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload value at {path} must match the schema const"));
-                return;
-            }
-
-            var typeName = schema["type"]?.GetValue<string>();
-            if (!string.IsNullOrWhiteSpace(typeName) && !MatchesSchemaType(instance, typeName!))
-            {
-                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload value at {path} must be of type {typeName}"));
-                return;
-            }
-
-            if (schema["enum"] is JsonArray enumValues && enumValues.Count > 0)
-            {
-                var match = enumValues.Any(node => JsonNodeDeepEquals(instance, node));
-                if (!match)
-                {
-                    findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload value at {path} has an unsupported enum value"));
-                    return;
-                }
-            }
-
-            if (instance is JsonObject obj)
-            {
-                ValidateObjectSchema(obj, schema, path, rootSchema, findings);
-            }
-            else if (instance is JsonArray array)
-            {
-                ValidateArraySchema(array, schema, path, rootSchema, findings);
-            }
-            else if (instance is JsonValue value)
-            {
-                ValidateScalarSchema(value, schema, path, findings);
-            }
-        }
-
-        private static void ValidateObjectSchema(JsonObject obj, JsonObject schema, string path, JsonObject rootSchema, List<JsonObject> findings)
-        {
-            var allowedProperties = schema["properties"] as JsonObject ?? new JsonObject();
-            var required = schema["required"] as JsonArray ?? new JsonArray();
-            var additionalProperties = schema["additionalProperties"]?.GetValue<bool?>() ?? true;
-
-            foreach (var req in required.OfType<JsonValue>())
-            {
-                var key = req.GetValue<string>();
-                if (!obj.ContainsKey(key))
-                {
-                    findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload missing required field: {path}.{key}"));
-                }
-            }
-
-            foreach (var kv in obj)
-            {
-                if (!allowedProperties.TryGetPropertyValue(kv.Key, out var propertySchemaNode) || propertySchemaNode is not JsonObject propertySchema)
-                {
-                    if (!additionalProperties)
-                    {
-                        findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload has unknown field: {path}.{kv.Key}"));
-                    }
-
-                    continue;
-                }
-
-                ValidateJsonSchema(kv.Value, propertySchema, $"{path}.{kv.Key}", rootSchema, findings);
-            }
-        }
-
-        private static void ValidateArraySchema(JsonArray array, JsonObject schema, string path, JsonObject rootSchema, List<JsonObject> findings)
-        {
-            if (schema["minItems"] is JsonValue minItemsValue && minItemsValue.TryGetValue<int>(out var minItems) && array.Count < minItems)
-            {
-                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload array at {path} must contain at least {minItems} items"));
-            }
-
-            if (schema["maxItems"] is JsonValue maxItemsValue && maxItemsValue.TryGetValue<int>(out var maxItems) && array.Count > maxItems)
-            {
-                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload array at {path} must contain at most {maxItems} items"));
-            }
-
-            JsonObject? itemSchema = null;
-            if (schema["items"] is JsonObject inlineItemSchema)
-            {
-                itemSchema = inlineItemSchema;
-            }
-            else if (schema["items"] is JsonValue itemRefValue && itemRefValue.TryGetValue<string>(out var itemReference))
-            {
-                itemSchema = ResolveSchemaReference(rootSchema, itemReference, path, findings);
-            }
-
-            if (itemSchema == null)
-            {
-                return;
-            }
-
-            for (var i = 0; i < array.Count; i++)
-            {
-                ValidateJsonSchema(array[i], itemSchema, $"{path}[{i}]", rootSchema, findings);
-            }
-        }
-
-        private static void ValidateScalarSchema(JsonValue value, JsonObject schema, string path, List<JsonObject> findings)
-        {
-            if (schema["pattern"] is JsonValue patternValue && patternValue.TryGetValue<string>(out var pattern))
-            {
-                var text = value.GetValue<string>() ?? string.Empty;
-                if (!Regex.IsMatch(text, pattern))
-                {
-                    findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload value at {path} does not match the required pattern"));
-                }
-            }
-
-            if (schema["minimum"] is JsonValue minimumValue && minimumValue.TryGetValue<double>(out var minimum))
-            {
-                if (value.TryGetValue<double>(out var number) && number < minimum)
-                {
-                    findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload value at {path} must be >= {minimum.ToString(CultureInfo.InvariantCulture)}"));
-                }
-            }
-
-            if (schema["maximum"] is JsonValue maximumValue && maximumValue.TryGetValue<double>(out var maximum))
-            {
-                if (value.TryGetValue<double>(out var number) && number > maximum)
-                {
-                    findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload value at {path} must be <= {maximum.ToString(CultureInfo.InvariantCulture)}"));
-                }
-            }
-        }
-
-        private static JsonObject? ResolveSchemaReference(JsonObject rootSchema, string reference, string path, List<JsonObject> findings)
-        {
-            if (!reference.StartsWith("#/", StringComparison.Ordinal))
-            {
-                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Unsupported schema reference at {path}: {reference}"));
-                return null;
-            }
-
-            JsonNode? current = rootSchema;
-            foreach (var token in reference.Substring(2).Split('/', StringSplitOptions.RemoveEmptyEntries))
-            {
-                if (current is JsonObject currentObject && currentObject.TryGetPropertyValue(token, out var next))
-                {
-                    current = next;
-                    continue;
-                }
-
-                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Unresolved schema reference at {path}: {reference}"));
-                return null;
-            }
-
-            return current as JsonObject;
-        }
-
-        private static bool MatchesSchemaType(JsonNode? instance, string expectedType)
-        {
-            return expectedType switch
-            {
-                "object" => instance is JsonObject,
-                "array" => instance is JsonArray,
-                "string" => instance is JsonValue valueString && valueString.TryGetValue<string>(out _),
-                "integer" => instance is JsonValue valueInt && valueInt.TryGetValue<int>(out _),
-                "number" => instance is JsonValue valueNumber && valueNumber.TryGetValue<double>(out _),
-                "boolean" => instance is JsonValue valueBool && valueBool.TryGetValue<bool>(out _),
-                _ => true
-            };
-        }
-
-        private static bool JsonNodeDeepEquals(JsonNode? left, JsonNode? right)
-        {
-            if (left == null || right == null)
-            {
-                return left == right;
-            }
-
-            return string.Equals(left.ToJsonString(), right.ToJsonString(), StringComparison.Ordinal);
         }
 
         private static JsonObject? RequiredPayloadObject(JsonObject obj, string key, List<JsonObject> findings)
@@ -1838,7 +1617,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             }
         }
 
-        private static string MissionResultJson(string status, string missionId, IEnumerable<string> artifacts, IEnumerable<JsonObject> findings)
+        private static string MissionResultJson(string status, string missionId, IEnumerable<string> artifacts, IEnumerable<JsonObject> findings, JsonObject? metrics = null, JsonObject? state = null)
         {
             return new JsonObject
             {
@@ -1846,7 +1625,13 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["missionId"] = missionId,
                 ["pipelineVersion"] = PipelineVersion,
                 ["artifacts"] = new JsonArray(artifacts.Select(a => (JsonNode?)a).ToArray()),
-                ["findings"] = FindingsArray(findings)
+                ["findings"] = FindingsArray(findings),
+                ["metrics"] = metrics != null ? (JsonObject)metrics.DeepClone() : new JsonObject(),
+                ["state"] = state != null ? (JsonObject)state.DeepClone() : new JsonObject
+                {
+                    ["currentStep"] = "",
+                    ["jobId"] = ""
+                }
             }.ToJsonString();
         }
 
@@ -1890,6 +1675,10 @@ namespace BreachScenarioEngine.Mcp.Editor
                 ["verification"] = new JsonObject
                 {
                     ["status"] = summaryNode["status"]?.GetValue<string>() ?? "PASS",
+                    ["retryClass"] = summaryNode["retryClass"]?.GetValue<string>() ?? "PASS",
+                    ["failureCode"] = summaryNode["failureCode"]?.GetValue<string>() ?? "",
+                    ["retryableFailureCount"] = summaryNode["retryableFailureCount"]?.GetValue<int>() ?? 0,
+                    ["blockingFailureCount"] = summaryNode["blockingFailureCount"]?.GetValue<int>() ?? 0,
                     ["findings"] = (summaryNode["findings"] as JsonArray)?.DeepClone() ?? new JsonArray(),
                     ["metrics"] = (summaryNode["metrics"] as JsonObject)?.DeepClone() ?? EmptyVerificationMetrics()
                 }
@@ -2235,10 +2024,6 @@ namespace BreachScenarioEngine.Mcp.Editor
             public bool EnforcePostLayoutPlacement { get; private set; }
             public double WallMultiplier { get; private set; }
             public double DoorPenalty { get; private set; }
-            public bool HasProfileRefsSection { get; private set; }
-            public bool HasCatalogRefsSection { get; private set; }
-            public Dictionary<string, string> ProfileRefsMap { get; } = new(StringComparer.Ordinal);
-            public Dictionary<string, string> CatalogRefsMap { get; } = new(StringComparer.Ordinal);
             public List<MissionActor> Actors { get; } = new();
             public List<MissionObjective> PrimaryObjectives { get; } = new();
             public List<MissionObjective> SecondaryObjectives { get; } = new();
@@ -2248,7 +2033,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             public JsonObject ProfileRefs()
             {
                 const string root = "Assets/Data/Mission/Profiles";
-                var result = new JsonObject
+                return new JsonObject
                 {
                     ["tacticalThemeProfile"] = $"{root}/TacticalThemeProfile.asset",
                     ["performanceProfile"] = $"{root}/PerformanceProfile.asset",
@@ -2257,29 +2042,6 @@ namespace BreachScenarioEngine.Mcp.Editor
                     ["tacticalDensityProfile"] = $"{root}/TacticalDensityProfile.asset",
                     ["addressablesCatalogProfile"] = $"{root}/AddressablesCatalogProfile.asset"
                 };
-                foreach (var kv in ProfileRefsMap)
-                {
-                    result[kv.Key] = kv.Value;
-                }
-
-                return result;
-            }
-
-            public JsonObject CatalogRefs()
-            {
-                const string root = "Assets/Data/Mission/Catalogs";
-                var result = new JsonObject
-                {
-                    ["enemyCatalog"] = $"{root}/EnemyCatalog.asset",
-                    ["environmentCatalog"] = $"{root}/EnvironmentCatalog.asset",
-                    ["objectiveCatalog"] = $"{root}/ObjectiveCatalog.asset"
-                };
-                foreach (var kv in CatalogRefsMap)
-                {
-                    result[kv.Key] = kv.Value;
-                }
-
-                return result;
             }
 
             public static bool TryLoad(string path, string? requestedMissionId, out MissionTemplateModel? template, out List<JsonObject> findings)
@@ -2330,17 +2092,9 @@ namespace BreachScenarioEngine.Mcp.Editor
                         objectiveSection = "";
                         currentActor = null;
                         currentObjective = null;
-                        if (section == "profileRefs")
+                        if (!new[] { "generationMeta", "spatialConstraints", "tacticalRules", "actorRoster", "objectives" }.Contains(section, StringComparer.Ordinal))
                         {
-                            template.HasProfileRefsSection = true;
-                        }
-                        else if (section == "catalogRefs")
-                        {
-                            template.HasCatalogRefsSection = true;
-                        }
-                        if (!new[] { "generationMeta", "spatialConstraints", "tacticalRules", "profileRefs", "catalogRefs", "actorRoster", "objectives" }.Contains(section, StringComparer.Ordinal))
-                        {
-                            findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown top-level section: {section}", pathPrefix));
+                            findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown top-level section: {section}", pathPrefix));
                         }
                         continue;
                     }
@@ -2367,7 +2121,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                             objectiveSection = subsection;
                             if (objectiveSection != "primary" && objectiveSection != "secondary")
                             {
-                                findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown objectives section: {objectiveSection}", pathPrefix));
+                                findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown objectives section: {objectiveSection}", pathPrefix));
                             }
                         }
                         continue;
@@ -2418,12 +2172,6 @@ namespace BreachScenarioEngine.Mcp.Editor
                         continue;
                     }
 
-                    if (section == "profileRefs" || section == "catalogRefs")
-                    {
-                        SetReference(template, section, line, findings, pathPrefix);
-                        continue;
-                    }
-
                     SetSectionScalar(template, section, subsection, line, findings, pathPrefix);
                 }
 
@@ -2439,7 +2187,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                     case "schemaVersion": template.SchemaVersion = template.MarkedString(value, "schemaVersion", findings, path); break;
                     case "missionId": template.MissionId = template.MarkedString(value, "missionId", findings, path); break;
                     case "missionTitle": template.MissionTitle = template.MarkedString(value, "missionTitle", findings, path); break;
-                    default: findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown top-level field: {key}", path)); break;
+                    default: findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown top-level field: {key}", path)); break;
                 }
             }
 
@@ -2453,7 +2201,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                         else if (key == "effectiveSeed") template.EffectiveSeed = template.MarkedInt(value, "generationMeta.effectiveSeed", findings, path);
                         else if (key == "generationTimeout") template.GenerationTimeout = template.MarkedInt(value, "generationMeta.generationTimeout", findings, path);
                         else if (key == "maxRetries") template.MaxRetries = template.MarkedInt(value, "generationMeta.maxRetries", findings, path);
-                        else findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown generationMeta field: {key}", path));
+                        else findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown generationMeta field: {key}", path));
                         break;
                     case "spatialConstraints":
                         if (key == "worldBounds") template.WorldBounds = template.MarkedIntList(value, "spatialConstraints.worldBounds", findings, path);
@@ -2463,7 +2211,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                         else if (subsection == "bspConstraints" && key == "maxRoomSize") template.MaxRoomSize = template.MarkedIntList(value, "spatialConstraints.bspConstraints.maxRoomSize", findings, path);
                         else if (subsection == "bspConstraints" && key == "corridorWidth") template.CorridorWidth = template.MarkedInt(value, "spatialConstraints.bspConstraints.corridorWidth", findings, path);
                         else if (subsection == "bspConstraints" && key == "forceRoomAdjacency") template.ForceRoomAdjacency = template.MarkedBool(value, "spatialConstraints.bspConstraints.forceRoomAdjacency", findings, path);
-                        else findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown spatialConstraints field: {key}", path));
+                        else findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown spatialConstraints field: {key}", path));
                         break;
                     case "tacticalRules":
                         if (key == "noiseAlertThreshold") template.NoiseAlertThreshold = template.MarkedDouble(value, "tacticalRules.noiseAlertThreshold", findings, path);
@@ -2471,16 +2219,10 @@ namespace BreachScenarioEngine.Mcp.Editor
                         else if (key == "enforcePostLayoutPlacement") template.EnforcePostLayoutPlacement = template.MarkedBool(value, "tacticalRules.enforcePostLayoutPlacement", findings, path);
                         else if (subsection == "acousticOcclusion" && key == "wallMultiplier") template.WallMultiplier = template.MarkedDouble(value, "tacticalRules.acousticOcclusion.wallMultiplier", findings, path);
                         else if (subsection == "acousticOcclusion" && key == "doorPenalty") template.DoorPenalty = template.MarkedDouble(value, "tacticalRules.acousticOcclusion.doorPenalty", findings, path);
-                        else findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown tacticalRules field: {key}", path));
-                        break;
-                    case "profileRefs":
-                        SetReference(template, "profileRefs", line, findings, path);
-                        break;
-                    case "catalogRefs":
-                        SetReference(template, "catalogRefs", line, findings, path);
+                        else findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown tacticalRules field: {key}", path));
                         break;
                     default:
-                        findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Field is not in a known section: {key}", path));
+                        findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Field is not in a known section: {key}", path));
                         break;
                 }
             }
@@ -2495,7 +2237,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                     case "countRange": actor.CountRange = ParseIntList(value, "actorRoster[].countRange", findings, path); break;
                     case "navigationPolicy": actor.NavigationPolicy = ParseString(value, "actorRoster[].navigationPolicy", findings, path); break;
                     case "placementPolicy": actor.PlacementPolicy = ParseString(value, "actorRoster[].placementPolicy", findings, path); break;
-                    default: findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown actor field: {key}", path)); break;
+                    default: findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown actor field: {key}", path)); break;
                 }
             }
 
@@ -2509,48 +2251,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                     case "requiresLayoutGraph": objective.RequiresLayoutGraph = ParseBool(value, "objectives[].requiresLayoutGraph", findings, path); break;
                     case "targetRoomTag": objective.TargetRoomTag = ParseString(value, "objectives[].targetRoomTag", findings, path); break;
                     case "optional": objective.Optional = ParseBool(value, "objectives[].optional", findings, path); break;
-                    default: findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown objective field: {key}", path)); break;
-                }
-            }
-
-            private static void SetReference(MissionTemplateModel template, string section, string line, List<JsonObject> findings, string path)
-            {
-                var (key, value) = KeyValue(line);
-                var normalized = ParseString(value, $"{section}.{key}", findings, path);
-                if (string.IsNullOrWhiteSpace(normalized))
-                {
-                    return;
-                }
-
-                if (section == "profileRefs")
-                {
-                    if (!new[]
-                        {
-                            "tacticalThemeProfile",
-                            "performanceProfile",
-                            "renderProfile",
-                            "navigationPolicy",
-                            "tacticalDensityProfile",
-                            "addressablesCatalogProfile"
-                        }.Contains(key, StringComparer.Ordinal))
-                    {
-                        findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown profileRefs field: {key}", path));
-                        return;
-                    }
-
-                    template.ProfileRefsMap[key] = normalized;
-                    return;
-                }
-
-                if (section == "catalogRefs")
-                {
-                    if (!new[] { "enemyCatalog", "environmentCatalog", "objectiveCatalog" }.Contains(key, StringComparer.Ordinal))
-                    {
-                        findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown catalogRefs field: {key}", path));
-                        return;
-                    }
-
-                    template.CatalogRefsMap[key] = normalized;
+                    default: findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown objective field: {key}", path)); break;
                 }
             }
 
@@ -2574,15 +2275,8 @@ namespace BreachScenarioEngine.Mcp.Editor
                 Required(template._seenFields.Contains("tacticalRules.enforcePostLayoutPlacement"), "tacticalRules.enforcePostLayoutPlacement", findings);
                 Required(template._seenFields.Contains("tacticalRules.acousticOcclusion.wallMultiplier"), "tacticalRules.acousticOcclusion.wallMultiplier", findings);
                 Required(template._seenFields.Contains("tacticalRules.acousticOcclusion.doorPenalty"), "tacticalRules.acousticOcclusion.doorPenalty", findings);
-                if (template.Actors.Count == 0)
-                {
-                    findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", "actorRoster must contain at least one actor"));
-                }
-
-                if (template.PrimaryObjectives.Count == 0)
-                {
-                    findings.Add(Finding("error", "TPL_OBJECTIVE_INVALID", "objectives.primary must contain at least one objective"));
-                }
+                Required(template.Actors.Count > 0, "actorRoster", findings);
+                Required(template.PrimaryObjectives.Count > 0, "objectives.primary", findings);
 
                 if (template.SchemaVersion != TemplateSchemaVersion)
                 {
@@ -2606,7 +2300,7 @@ namespace BreachScenarioEngine.Mcp.Editor
 
                 if (template.PixelsPerUnit != 128 && template.PixelsPerUnit != 256)
                 {
-                    findings.Add(Finding("error", "TPL_RANGE_INVALID", "spatialConstraints.pixelsPerUnit must be 128 or 256"));
+                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", "spatialConstraints.pixelsPerUnit must be 128 or 256"));
                 }
 
                 RangeAtLeast(template.InitialSeed, 0, "generationMeta.initialSeed", findings);
@@ -2625,42 +2319,9 @@ namespace BreachScenarioEngine.Mcp.Editor
                 {
                     if (template.MinRoomSize[0] > template.MaxRoomSize[0] || template.MinRoomSize[1] > template.MaxRoomSize[1])
                     {
-                        findings.Add(Finding("error", "TPL_RANGE_INVALID", "minRoomSize must be less than or equal to maxRoomSize"));
+                        findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", "minRoomSize must be less than or equal to maxRoomSize"));
                     }
                 }
-
-                ValidateReferenceSection(template.HasProfileRefsSection, template.ProfileRefsMap, new[]
-                {
-                    "tacticalThemeProfile",
-                    "performanceProfile",
-                    "renderProfile",
-                    "navigationPolicy",
-                    "tacticalDensityProfile",
-                    "addressablesCatalogProfile"
-                }, "profileRefs", "TPL_PROFILE_REF_MISSING", "bse.profile.v2.3", "profileType", new Dictionary<string, string>(StringComparer.Ordinal)
-                {
-                    ["tacticalThemeProfile"] = "TacticalThemeProfile",
-                    ["performanceProfile"] = "PerformanceProfile",
-                    ["renderProfile"] = "RenderProfile",
-                    ["navigationPolicy"] = "NavigationPolicy",
-                    ["tacticalDensityProfile"] = "TacticalDensityProfile",
-                    ["addressablesCatalogProfile"] = "AddressablesCatalogProfile"
-                }, new Dictionary<string, string[]>(StringComparer.Ordinal)
-                {
-                    ["addressablesCatalogProfile"] = new[] { "biome", "actor", "objective", "cover" }
-                }, findings);
-
-                ValidateReferenceSection(template.HasCatalogRefsSection, template.CatalogRefsMap, new[]
-                {
-                    "enemyCatalog",
-                    "environmentCatalog",
-                    "objectiveCatalog"
-                }, "catalogRefs", "TPL_PROFILE_REF_MISSING", "bse.catalog.v2.3", "catalogType", new Dictionary<string, string>(StringComparer.Ordinal)
-                {
-                    ["enemyCatalog"] = "EnemyCatalog",
-                    ["environmentCatalog"] = "EnvironmentCatalog",
-                    ["objectiveCatalog"] = "ObjectiveCatalog"
-                }, null, findings);
 
                 ValidateActors(template.Actors, findings);
                 ValidateObjectives(template.PrimaryObjectives, "objectives.primary", findings);
@@ -2673,56 +2334,32 @@ namespace BreachScenarioEngine.Mcp.Editor
                 var ids = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var actor in actors)
                 {
-                    if (string.IsNullOrWhiteSpace(actor.Id))
-                    {
-                        findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", "actorRoster[].id is required"));
-                    }
-
-                    if (string.IsNullOrWhiteSpace(actor.Type))
-                    {
-                        findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", "actorRoster[].type is required"));
-                    }
-
-                    if (string.IsNullOrWhiteSpace(actor.NavigationPolicy))
-                    {
-                        findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", "actorRoster[].navigationPolicy is required"));
-                    }
-
-                    if (string.IsNullOrWhiteSpace(actor.PlacementPolicy))
-                    {
-                        findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", "actorRoster[].placementPolicy is required"));
-                    }
-
-                    if (actor.CountRange.Length != 2)
-                    {
-                        findings.Add(Finding("error", "TPL_RANGE_INVALID", "actorRoster[].countRange must contain exactly two integers"));
-                    }
-
+                    Required(actor.Id, "actorRoster[].id", findings);
+                    Required(actor.Type, "actorRoster[].type", findings);
+                    Required(actor.NavigationPolicy, "actorRoster[].navigationPolicy", findings);
+                    Required(actor.PlacementPolicy, "actorRoster[].placementPolicy", findings);
+                    Required(actor.CountRange.Length == 2, "actorRoster[].countRange", findings);
                     if (!string.IsNullOrWhiteSpace(actor.Id) && !ids.Add(actor.Id))
                     {
-                        findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", $"Duplicate actor id: {actor.Id}"));
+                        findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", $"Duplicate actor id: {actor.Id}"));
                     }
 
                     if (!NavigationPolicies.Contains(actor.NavigationPolicy))
                     {
-                        findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", $"Unsupported actor navigationPolicy: {actor.NavigationPolicy}"));
+                        findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unsupported actor navigationPolicy: {actor.NavigationPolicy}"));
                     }
 
                     if (!PlacementPolicies.Contains(actor.PlacementPolicy))
                     {
-                        findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", $"Unsupported actor placementPolicy: {actor.PlacementPolicy}"));
+                        findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unsupported actor placementPolicy: {actor.PlacementPolicy}"));
                     }
 
                     if (actor.CountRange.Length == 2)
                     {
                         if (actor.CountRange[0] < 0 || actor.CountRange[1] < 0 || actor.CountRange[0] > actor.CountRange[1])
                         {
-                            findings.Add(Finding("error", "TPL_RANGE_INVALID", $"Invalid actor countRange for {actor.Id}"));
+                            findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Invalid actor countRange for {actor.Id}"));
                         }
-                    }
-                    else
-                    {
-                        findings.Add(Finding("error", "TPL_RANGE_INVALID", $"actorRoster[].countRange must contain exactly two integers for {actor.Id}"));
                     }
                 }
             }
@@ -2732,127 +2369,18 @@ namespace BreachScenarioEngine.Mcp.Editor
                 var ids = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var objective in objectives)
                 {
-                    if (string.IsNullOrWhiteSpace(objective.Id))
-                    {
-                        findings.Add(Finding("error", "TPL_OBJECTIVE_INVALID", $"{section}[].id is required"));
-                    }
-
-                    if (string.IsNullOrWhiteSpace(objective.Type))
-                    {
-                        findings.Add(Finding("error", "TPL_OBJECTIVE_INVALID", $"{section}[].type is required"));
-                    }
-
+                    Required(objective.Id, $"{section}[].id", findings);
+                    Required(objective.Type, $"{section}[].type", findings);
                     if (!string.IsNullOrWhiteSpace(objective.Id) && !ids.Add(objective.Id))
                     {
-                        findings.Add(Finding("error", "TPL_OBJECTIVE_INVALID", $"Duplicate objective id: {objective.Id}"));
+                        findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", $"Duplicate objective id: {objective.Id}"));
                     }
 
                     if (objective.RequiresLayoutGraph == true && string.IsNullOrWhiteSpace(objective.TargetRoomTag))
                     {
-                        findings.Add(Finding("error", "TPL_OBJECTIVE_INVALID", $"{objective.Id} requires a targetRoomTag when requiresLayoutGraph is true"));
+                        findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", $"{objective.Id} requires a targetRoomTag when requiresLayoutGraph is true"));
                     }
                 }
-            }
-
-            private static void ValidateReferenceSection(
-                bool sectionSeen,
-                IDictionary<string, string> refs,
-                IReadOnlyCollection<string> requiredKeys,
-                string sectionName,
-                string missingCode,
-                string expectedSchemaVersion,
-                string typeFieldName,
-                IDictionary<string, string>? expectedTypes,
-                IDictionary<string, string[]>? requiredLabels,
-                List<JsonObject> findings)
-            {
-                if (!sectionSeen)
-                {
-                    return;
-                }
-
-                foreach (var key in requiredKeys)
-                {
-                    if (!refs.TryGetValue(key, out var assetPath) || string.IsNullOrWhiteSpace(assetPath))
-                    {
-                        findings.Add(Finding("error", missingCode, $"Missing {sectionName}.{key}"));
-                        continue;
-                    }
-
-                    var absolutePath = ToAbsoluteProjectPath(assetPath);
-                    if (!IsUnderProjectRoot(absolutePath) || (!File.Exists(absolutePath) && AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) == null))
-                    {
-                        findings.Add(Finding("error", missingCode, $"{sectionName}.{key} does not resolve: {assetPath}", assetPath));
-                        continue;
-                    }
-
-                    ValidateContentAsset(absolutePath, findings, sectionName, key, assetPath, expectedSchemaVersion, typeFieldName, expectedTypes, requiredLabels);
-                }
-            }
-
-            private static void ValidateContentAsset(
-                string absolutePath,
-                List<JsonObject> findings,
-                string sectionName,
-                string key,
-                string repoRelativePath,
-                string expectedSchemaVersion,
-                string typeFieldName,
-                IDictionary<string, string>? expectedTypes,
-                IDictionary<string, string[]>? requiredLabels)
-            {
-                string content;
-                try
-                {
-                    content = File.ReadAllText(absolutePath);
-                }
-                catch (Exception ex)
-                {
-                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{sectionName}.{key} is unreadable: {ex.Message}", repoRelativePath));
-                    return;
-                }
-
-                var schemaVersion = ReadScalarField(content, "schemaVersion");
-                if (!string.Equals(schemaVersion, expectedSchemaVersion, StringComparison.Ordinal))
-                {
-                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{sectionName}.{key} must use {expectedSchemaVersion}", repoRelativePath));
-                }
-
-                if (expectedTypes != null && expectedTypes.TryGetValue(key, out var expectedType))
-                {
-                    var actualType = ReadScalarField(content, typeFieldName);
-                    if (!string.Equals(actualType, expectedType, StringComparison.Ordinal))
-                    {
-                        findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{sectionName}.{key} must declare {typeFieldName}: {expectedType}", repoRelativePath));
-                    }
-                }
-
-                if (requiredLabels != null && requiredLabels.TryGetValue(key, out var labels))
-                {
-                    foreach (var label in labels)
-                    {
-                        if (!content.Contains($"- {label}", StringComparison.Ordinal))
-                        {
-                            findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{sectionName}.{key} is missing required Addressables label: {label}", repoRelativePath));
-                        }
-                    }
-                }
-            }
-
-            private static string ReadScalarField(string content, string fieldName)
-            {
-                foreach (var line in content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None))
-                {
-                    var trimmed = line.Trim();
-                    if (!trimmed.StartsWith(fieldName + ":", StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
-
-                    return trimmed.Substring(fieldName.Length + 1).Trim().Trim('"');
-                }
-
-                return "";
             }
 
             private static void ValidateObjectiveReferences(MissionTemplateModel template, List<JsonObject> findings)
@@ -2869,12 +2397,12 @@ namespace BreachScenarioEngine.Mcp.Editor
                 {
                     if (!string.IsNullOrWhiteSpace(objective.Id) && !ids.Add(objective.Id))
                     {
-                        findings.Add(Finding("error", "TPL_OBJECTIVE_INVALID", $"Duplicate objective id across objective sections: {objective.Id}"));
+                        findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", $"Duplicate objective id across objective sections: {objective.Id}"));
                     }
 
                     if (!string.IsNullOrWhiteSpace(objective.TargetRoomTag) && !knownRoomTags.Contains(objective.TargetRoomTag))
                     {
-                        findings.Add(Finding("error", "TPL_OBJECTIVE_INVALID", $"Unknown objective targetRoomTag: {objective.TargetRoomTag}"));
+                        findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", $"Unknown objective targetRoomTag: {objective.TargetRoomTag}"));
                     }
                 }
             }
@@ -2883,7 +2411,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             {
                 if (values.Count == 2 && values.Any(v => v < 1))
                 {
-                    findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} values must be positive"));
+                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} values must be positive"));
                 }
             }
 
@@ -2891,7 +2419,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             {
                 if (value < minimum)
                 {
-                    findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} must be >= {minimum}"));
+                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} must be >= {minimum}"));
                 }
             }
 
@@ -2899,7 +2427,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             {
                 if (value < minimum)
                 {
-                    findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} must be >= {minimum.ToString(CultureInfo.InvariantCulture)}"));
+                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} must be >= {minimum.ToString(CultureInfo.InvariantCulture)}"));
                 }
             }
 
@@ -2907,7 +2435,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             {
                 if (value < minimum || value > maximum)
                 {
-                    findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} must be between {minimum.ToString(CultureInfo.InvariantCulture)} and {maximum.ToString(CultureInfo.InvariantCulture)}"));
+                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} must be between {minimum.ToString(CultureInfo.InvariantCulture)} and {maximum.ToString(CultureInfo.InvariantCulture)}"));
                 }
             }
 
@@ -2925,7 +2453,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                     return result;
                 }
 
-                findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} must be an integer", path));
+                findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} must be an integer", path));
                 return 0;
             }
 
@@ -2937,7 +2465,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                     return result;
                 }
 
-                findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} must be a number", path));
+                findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} must be a number", path));
                 return 0;
             }
 
@@ -2969,7 +2497,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                 var trimmed = value.Trim();
                 if (!trimmed.StartsWith("[", StringComparison.Ordinal) || !trimmed.EndsWith("]", StringComparison.Ordinal))
                 {
-                    findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} must be an inline integer array", path));
+                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} must be an inline integer array", path));
                     return Array.Empty<int>();
                 }
 
@@ -2979,7 +2507,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                 {
                     if (!int.TryParse(piece, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
                     {
-                        findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} contains a non-integer value", path));
+                        findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} contains a non-integer value", path));
                         return Array.Empty<int>();
                     }
 
@@ -3075,4 +2603,3 @@ namespace BreachScenarioEngine.Mcp.Editor
         }
     }
 }
-
