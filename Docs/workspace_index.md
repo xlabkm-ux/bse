@@ -11,6 +11,7 @@ Short map of the main working areas in the Breach Scenario Engine repository.
 | [Docs/](.) | Active and project documentation |
 | [UserMissionSources/missions](../UserMissionSources/missions) | User-authored mission templates |
 | [Assets/Data/Mission/Profiles](../Assets/Data/Mission/Profiles) | Global mission profile defaults |
+| `Assets/Data/Mission/Catalogs` | Planned v2.3 global mission catalog root |
 
 ## Quick orientation
 
@@ -25,5 +26,6 @@ Short map of the main working areas in the Breach Scenario Engine repository.
 - Contract and schema updates: `dotnet-prototype/contracts`
 - Mission authoring inputs: `UserMissionSources/missions`
 - Mission profile defaults: `Assets/Data/Mission/Profiles`
+- Planned mission catalog defaults: `Assets/Data/Mission/Catalogs`
 - Validation and runtime checks: `dotnet-prototype/tests`
 - Human-facing guidance: `Docs/`

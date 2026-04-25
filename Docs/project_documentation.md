@@ -37,23 +37,23 @@ MCP backlog and generic bridge workflow notes are not part of the active docs.
 
 ### Mission pipeline contracts
 
-- [Docs/breach_mcp_architecture_v2.2.md](breach_mcp_architecture_v2.2.md)
-  - Layout-first mission generation architecture
+- [Docs/breach_mcp_architecture_v2.3.md](breach_mcp_architecture_v2.3.md)
+  - Active layout-first mission generation architecture
 
-- [Docs/mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md)
-  - User-authored YAML ownership contract
+- [Docs/mission_authoring_contract_v2.3.md](mission_authoring_contract_v2.3.md)
+  - User-authored YAML ownership, profile root, and catalog root
 
-- [Docs/mission_template_v2.2.md](mission_template_v2.2.md)
+- [Docs/mission_template_v2.3.md](mission_template_v2.3.md)
   - Canonical mission template specification
 
-- [Docs/mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md)
+- [Docs/mission_pipeline_contract_v2.3.md](mission_pipeline_contract_v2.3.md)
   - `manage_mission(...)` action order, result envelope, retries, and artifacts
 
-- [Docs/mission_data_contract_v2.2.md](mission_data_contract_v2.2.md)
+- [Docs/mission_data_contract_v2.3.md](mission_data_contract_v2.3.md)
   - Generated payload shape consumed by Unity
 
-- [Docs/generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md)
-  - Replay, seed, artifact, and verification manifest contract
+- [Docs/generation_manifest_contract_v2.3.md](generation_manifest_contract_v2.3.md)
+  - Accepted replay, seed, lifecycle, and manifest contract
 
 ### Planning and history
 
@@ -70,11 +70,13 @@ MCP backlog and generic bridge workflow notes are not part of the active docs.
 3. [Docs/audit_current_state_v2.3.md](audit_current_state_v2.3.md)
 4. [Docs/canonical_tools.md](canonical_tools.md)
 5. [Docs/runtime_tools.md](runtime_tools.md)
-6. [Docs/mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md)
-7. [Docs/mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md)
-8. [Docs/mission_data_contract_v2.2.md](mission_data_contract_v2.2.md)
-9. [Docs/generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md)
-10. [Docs/development_plan_sessions.md](development_plan_sessions.md)
+6. [Docs/breach_mcp_architecture_v2.3.md](breach_mcp_architecture_v2.3.md)
+7. [Docs/mission_authoring_contract_v2.3.md](mission_authoring_contract_v2.3.md)
+8. [Docs/mission_template_v2.3.md](mission_template_v2.3.md)
+9. [Docs/mission_pipeline_contract_v2.3.md](mission_pipeline_contract_v2.3.md)
+10. [Docs/mission_data_contract_v2.3.md](mission_data_contract_v2.3.md)
+11. [Docs/generation_manifest_contract_v2.3.md](generation_manifest_contract_v2.3.md)
+12. [Docs/development_plan_sessions.md](development_plan_sessions.md)
 
 ## 3. Runtime Snapshot
 

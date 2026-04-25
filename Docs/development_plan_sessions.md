@@ -38,7 +38,7 @@ Handoff note:
 
 Status:
 
-- pending
+- completed
 
 Goal:
 
@@ -57,12 +57,31 @@ Work:
   `Docs/runtime_tools.md`, `Docs/canonical_tools.md`, and this plan
 - decide the authoritative profile/catalog root before v2.3 validation work
 
+Completed:
+
+- created the repo-owned v2.3 documentation set
+- updated `README.md`, `Docs/README.md`, `Docs/index.md`,
+  `Docs/project_documentation.md`, `Docs/workspace_index.md`,
+  `Docs/runtime_tools.md`, `Docs/canonical_tools.md`, and this plan
+- made the active reading path point at v2.3 contracts
+- documented v2.3 invariants: Step 6 before Step 5, retry back to Step 6,
+  manifest only after PASS, JSON-only machine decisions, and `effectiveSeed`
+  only after PASS
+- chose `Assets/Data/Mission/Profiles/` as the authoritative profile root and
+  `Assets/Data/Mission/Catalogs/` as the authoritative catalog root
+
 Exit criteria:
 
 - active docs have a single v2.3 reading path
 - v2.3 invariants are explicitly documented:
   Step 6 before Step 5, retry to Step 6, manifest after PASS, JSON-only
   machine decisions, and `effectiveSeed` only after PASS
+
+Handoff note:
+
+- "The v2.3 docs are now repo-owned and active. Please implement the
+  mission-scoped `.generation.lock` and `mission_state.json` lifecycle next,
+  keeping `write_manifest` blocked unless verification is PASS."
 
 ### v2.3 Session 3: Generation Locks and Lifecycle
 
@@ -393,8 +412,10 @@ Before switching chats:
 ## Anchor Files
 
 - [Docs/audit_current_state_v2.3.md](audit_current_state_v2.3.md)
-- [Docs/mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md)
-- [Docs/mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md)
-- [Docs/mission_data_contract_v2.2.md](mission_data_contract_v2.2.md)
-- [Docs/generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md)
+- [Docs/breach_mcp_architecture_v2.3.md](breach_mcp_architecture_v2.3.md)
+- [Docs/mission_pipeline_contract_v2.3.md](mission_pipeline_contract_v2.3.md)
+- [Docs/mission_authoring_contract_v2.3.md](mission_authoring_contract_v2.3.md)
+- [Docs/mission_template_v2.3.md](mission_template_v2.3.md)
+- [Docs/mission_data_contract_v2.3.md](mission_data_contract_v2.3.md)
+- [Docs/generation_manifest_contract_v2.3.md](generation_manifest_contract_v2.3.md)
 - [Docs/runtime_tools.md](runtime_tools.md)

@@ -16,19 +16,20 @@ Initial project scaffold for **TACTICAL BREACH: Mission Architect / Breach Scena
 ## Mission Workflow
 
 1. Fill a mission template in `UserMissionSources/missions/<missionId>/mission_design.template.yaml`
-2. Validate it against `Docs/mission_authoring_contract_v2.2.md`
-3. Compile it through `Docs/mission_pipeline_contract_v2.2.md` into `mission_payload.generated.json`
-4. Verify the generated mission and write `generation_manifest.json`
+2. Validate it against `Docs/mission_authoring_contract_v2.3.md`
+3. Compile it through `Docs/mission_pipeline_contract_v2.3.md` into `mission_payload.generated.json`
+4. Generate layout before placement, verify the generated mission, and write `generation_manifest.json` only after PASS
 
 ## Docs
 
 - [Docs/README.md](Docs/README.md)
 - [Docs/index.md](Docs/index.md)
-- [Docs/breach_mcp_architecture_v2.2.md](Docs/breach_mcp_architecture_v2.2.md)
-- [Docs/mission_authoring_contract_v2.2.md](Docs/mission_authoring_contract_v2.2.md)
-- [Docs/mission_pipeline_contract_v2.2.md](Docs/mission_pipeline_contract_v2.2.md)
-- [Docs/mission_data_contract_v2.2.md](Docs/mission_data_contract_v2.2.md)
-- [Docs/generation_manifest_contract_v2.2.md](Docs/generation_manifest_contract_v2.2.md)
+- [Docs/breach_mcp_architecture_v2.3.md](Docs/breach_mcp_architecture_v2.3.md)
+- [Docs/mission_authoring_contract_v2.3.md](Docs/mission_authoring_contract_v2.3.md)
+- [Docs/mission_template_v2.3.md](Docs/mission_template_v2.3.md)
+- [Docs/mission_pipeline_contract_v2.3.md](Docs/mission_pipeline_contract_v2.3.md)
+- [Docs/mission_data_contract_v2.3.md](Docs/mission_data_contract_v2.3.md)
+- [Docs/generation_manifest_contract_v2.3.md](Docs/generation_manifest_contract_v2.3.md)
 
 ## Standards
 
@@ -40,5 +41,5 @@ Initial project scaffold for **TACTICAL BREACH: Mission Architect / Breach Scena
 ## Next Steps
 
 - Keep mission pipeline contracts and runtime behavior in sync.
-- Expand template validation and payload fidelity from the session plan.
+- Implement v2.3 generation locks and lifecycle state from the session plan.
 - Use `Docs/canonical_tools.md` as the current project MCP tool contract.

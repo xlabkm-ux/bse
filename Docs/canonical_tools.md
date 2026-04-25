@@ -41,13 +41,19 @@ The mission pipeline writes project artifacts under
 - `mission_layout.generated.json`
 - `mission_entities.generated.json`
 - `verification_summary.json`
+- `mission_state.json`
 - `generation_manifest.json`
+
+The v2.3 lifecycle contract also reserves the transient mission lock:
+
+- `.generation.lock`
 
 ## Supporting Documentation
 
-- `mission_pipeline_contract_v2.2.md` defines action order, result envelope,
+- `mission_pipeline_contract_v2.3.md` defines action order, result envelope,
   retry behavior, and artifact ownership.
-- `mission_authoring_contract_v2.2.md` defines what authors may put in mission
+- `mission_authoring_contract_v2.3.md` defines what authors may put in mission
   templates.
-- `mission_data_contract_v2.2.md` defines generated payload shape.
-- `generation_manifest_contract_v2.2.md` defines replay and manifest fields.
+- `mission_data_contract_v2.3.md` defines generated payload shape.
+- `generation_manifest_contract_v2.3.md` defines accepted replay, lifecycle,
+  and manifest fields.
