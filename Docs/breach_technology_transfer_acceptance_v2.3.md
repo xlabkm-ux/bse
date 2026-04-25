@@ -34,6 +34,9 @@ Every transferred feature must satisfy:
 
 ## 2. Source Traceability
 
+The active source traceability audit is recorded in
+[breach_technology_transfer_traceability_v2.3.md](breach_technology_transfer_traceability_v2.3.md).
+
 Each transferred feature must record:
 
 - BREACH reference file

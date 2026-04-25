@@ -38,6 +38,7 @@ Initial project scaffold for **TACTICAL BREACH: Mission Architect / Breach Scena
 - [Docs/mission_data_contract_v2.3.md](Docs/mission_data_contract_v2.3.md)
 - [Docs/generation_manifest_contract_v2.3.md](Docs/generation_manifest_contract_v2.3.md)
 - [Docs/breach_technology_transfer_plan_v2.3.md](Docs/breach_technology_transfer_plan_v2.3.md)
+- [Docs/breach_technology_transfer_traceability_v2.3.md](Docs/breach_technology_transfer_traceability_v2.3.md)
 - [Docs/migration_from_breach_scene_builders.md](Docs/migration_from_breach_scene_builders.md)
 - [Docs/scene_materialization_contract_v2.3.md](Docs/scene_materialization_contract_v2.3.md)
 - [Docs/breach_technology_transfer_acceptance_v2.3.md](Docs/breach_technology_transfer_acceptance_v2.3.md)

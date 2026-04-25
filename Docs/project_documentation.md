@@ -71,6 +71,10 @@ MCP backlog and generic bridge workflow notes are not part of the active docs.
   - Phased plan for transferring BSP, tactical graphs, materialization,
     verification, content catalogs, and CI preview workflow
 
+- [Docs/breach_technology_transfer_traceability_v2.3.md](breach_technology_transfer_traceability_v2.3.md)
+  - Source-to-target audit for transferring BREACH technology without copying
+    legacy editor architecture
+
 - [Docs/scene_materialization_contract_v2.3.md](scene_materialization_contract_v2.3.md)
   - Contract for turning generated JSON artifacts into optional Unity scenes
 
@@ -100,9 +104,10 @@ MCP backlog and generic bridge workflow notes are not part of the active docs.
 11. [Docs/generation_manifest_contract_v2.3.md](generation_manifest_contract_v2.3.md)
 12. [Docs/migration_from_breach_scene_builders.md](migration_from_breach_scene_builders.md)
 13. [Docs/breach_technology_transfer_plan_v2.3.md](breach_technology_transfer_plan_v2.3.md)
-14. [Docs/scene_materialization_contract_v2.3.md](scene_materialization_contract_v2.3.md)
-15. [Docs/breach_technology_transfer_acceptance_v2.3.md](breach_technology_transfer_acceptance_v2.3.md)
-16. [Docs/development_plan_sessions.md](development_plan_sessions.md)
+14. [Docs/breach_technology_transfer_traceability_v2.3.md](breach_technology_transfer_traceability_v2.3.md)
+15. [Docs/scene_materialization_contract_v2.3.md](scene_materialization_contract_v2.3.md)
+16. [Docs/breach_technology_transfer_acceptance_v2.3.md](breach_technology_transfer_acceptance_v2.3.md)
+17. [Docs/development_plan_sessions.md](development_plan_sessions.md)
 
 ## 3. Runtime Snapshot
 

@@ -16,12 +16,6 @@ Unity находится здесь:
 Текущий активный трек:
 `BREACH Technology Transfer`.
 
-Целевые платформы проекта:
-- Primary: Windows 10 / 11 desktop, 1920x1080+ resolution, 16:9 or wider.
-- Secondary: Android mobile, 1080p portrait and landscape, touch controls,
-  optional controller support.
-- UI должен быть scalable для поддерживаемых desktop и mobile разрешений.
-
 Перед началом работы по сессии прочитай Anchor Files из раздела
 `Handoff Checklist` в плане разработки.
 </INSTRUCTIONS>

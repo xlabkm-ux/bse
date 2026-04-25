@@ -50,6 +50,7 @@ Deliverables:
 
 - `Docs/migration_from_breach_scene_builders.md`
 - `Docs/breach_technology_transfer_plan_v2.3.md`
+- `Docs/breach_technology_transfer_traceability_v2.3.md`
 - `Docs/scene_materialization_contract_v2.3.md`
 - `Docs/breach_technology_transfer_acceptance_v2.3.md`
 
@@ -78,6 +79,10 @@ Exit criteria:
 - each migrated feature points back to a BREACH reference file
 - each feature has a BSE target module
 - known hazards are listed before implementation starts
+
+Audit record:
+
+- [breach_technology_transfer_traceability_v2.3.md](breach_technology_transfer_traceability_v2.3.md)
 
 ## 4. Phase 2: Pure Layout Extraction
 

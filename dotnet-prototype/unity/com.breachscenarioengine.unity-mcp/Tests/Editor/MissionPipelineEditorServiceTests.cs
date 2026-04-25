@@ -238,11 +238,18 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.True(firstDoc.RootElement.TryGetProperty("CoverGraph", out _));
             Assert.True(firstDoc.RootElement.TryGetProperty("VisibilityGraph", out _));
             Assert.True(firstDoc.RootElement.TryGetProperty("HearingGraph", out _));
+            Assert.AreEqual("pure_bsp_layout_v1", firstDoc.RootElement.GetProperty("generator").GetProperty("id").GetString());
+            Assert.Greater(firstDoc.RootElement.GetProperty("RoomGraph").GetProperty("rooms").GetArrayLength(), 4);
+            Assert.Greater(firstDoc.RootElement.GetProperty("PortalGraph").GetProperty("portals").GetArrayLength(), 0);
+            Assert.Greater(firstDoc.RootElement.GetProperty("PortalGraph").GetProperty("windows").GetArrayLength(), 0);
+            Assert.Greater(firstDoc.RootElement.GetProperty("LayoutGraph").GetProperty("breachPoints").GetArrayLength(), 0);
 
             var (secondSuccess, secondMessage) = MissionPipelineEditorService.Execute("generate_layout", RawArgs(templatePath, payloadPath, layoutPath));
             Assert.True(secondSuccess, secondMessage);
             using var secondDoc = JsonDocument.Parse(File.ReadAllText(layoutPath));
             Assert.AreEqual(firstRevision, secondDoc.RootElement.GetProperty("layoutRevisionId").GetString());
+            Assert.AreEqual(firstDoc.RootElement.GetProperty("RoomGraph").GetProperty("rooms").GetRawText(), secondDoc.RootElement.GetProperty("RoomGraph").GetProperty("rooms").GetRawText());
+            Assert.AreEqual(firstDoc.RootElement.GetProperty("PortalGraph").GetProperty("portals").GetRawText(), secondDoc.RootElement.GetProperty("PortalGraph").GetProperty("portals").GetRawText());
 
             using var payloadDoc = JsonDocument.Parse(File.ReadAllText(payloadPath));
             Assert.AreEqual(firstRevision, payloadDoc.RootElement.GetProperty("header").GetProperty("layoutRevisionId").GetString());

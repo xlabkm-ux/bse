@@ -16,6 +16,7 @@ Active project documentation for the Breach Scenario Engine mission pipeline.
 - [generation_manifest_contract_v2.3.md](generation_manifest_contract_v2.3.md)
 - [migration_from_breach_scene_builders.md](migration_from_breach_scene_builders.md)
 - [breach_technology_transfer_plan_v2.3.md](breach_technology_transfer_plan_v2.3.md)
+- [breach_technology_transfer_traceability_v2.3.md](breach_technology_transfer_traceability_v2.3.md)
 - [scene_materialization_contract_v2.3.md](scene_materialization_contract_v2.3.md)
 - [breach_technology_transfer_acceptance_v2.3.md](breach_technology_transfer_acceptance_v2.3.md)
 - [canonical_tools.md](canonical_tools.md)
