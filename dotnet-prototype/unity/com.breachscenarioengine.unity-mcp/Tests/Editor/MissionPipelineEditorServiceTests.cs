@@ -8,6 +8,9 @@ using System.Text.Json.Nodes;
 using NUnit.Framework;
 using UnityEngine;
 
+#nullable enable
+#pragma warning disable 8602,8625
+
 namespace BreachScenarioEngine.Mcp.Editor.Tests
 {
     public sealed class MissionPipelineEditorServiceTests

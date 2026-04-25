@@ -17,6 +17,7 @@ using UnityEngine.SceneManagement;
 using Unity.Profiling;
 
 #nullable enable
+#pragma warning disable 8602,8604,8619,1717
 
 namespace BreachScenarioEngine.Mcp.Editor
 {
@@ -2588,7 +2589,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             return true;
         }
 
-        if (key.Length == 1)
+        if (key is { Length: 1 })
         {
             var upper = char.ToUpperInvariant(key[0]);
             if (Enum.TryParse(upper.ToString(), true, out parsed))
@@ -2609,7 +2610,8 @@ namespace BreachScenarioEngine.Mcp.Editor
             return false;
         }
 
-        return button.Trim().ToLowerInvariant() switch
+        var normalizedButton = button.Trim().ToLowerInvariant();
+        return normalizedButton switch
         {
             "left" => true,
             "leftmouse" => true,
@@ -2880,7 +2882,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             var add = AddGraphNode(load.Graph!, unitType!, nodeX, nodeY);
             if (!add.Success)
             {
-                return (false, add.Message);
+                return (false, add.Message ?? "");
             }
 
             state.nodes.Add(new GraphNodeState
@@ -4111,7 +4113,6 @@ namespace BreachScenarioEngine.Mcp.Editor
         {
             return (false, "prefabPath is required");
         }
-        prefabPath = prefabPath!;
         prefabPath = prefabPath.Replace("\\", "/");
         if (!prefabPath.StartsWith("Assets/", StringComparison.Ordinal))
         {
@@ -5151,7 +5152,7 @@ namespace BreachScenarioEngine.Mcp.Editor
         };
     }
 
-    private static string? FirstNonEmpty(params string[] values)
+    private static string? FirstNonEmpty(params string?[] values)
     {
         foreach (var value in values)
         {

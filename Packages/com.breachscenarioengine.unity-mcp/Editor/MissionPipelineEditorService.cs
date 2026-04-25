@@ -12,6 +12,7 @@ using UnityEditor;
 using UnityEngine;
 
 #nullable enable
+#pragma warning disable 8602,8604,8619,1717
 
 namespace BreachScenarioEngine.Mcp.Editor
 {
@@ -94,13 +95,14 @@ namespace BreachScenarioEngine.Mcp.Editor
 
             if (!GenerationLockSet.TryAcquire(template.MissionId, missionDir, "compile_payload", out var generationLock, out var conflictPath, out var conflictFinding))
             {
-                findings.Add(conflictFinding!);
+                findings.Add(conflictFinding);
                 return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
             }
 
-            using (generationLock!)
+            var lockHandle = generationLock ?? throw new InvalidOperationException("Generation lock acquisition failed.");
+            using (lockHandle)
             {
-                WriteMissionState(missionDir, template.MissionId, "VALIDATING", "compile_payload", "", LastFindingCode(findings), generationLock.JobId);
+                WriteMissionState(missionDir, template.MissionId, "VALIDATING", "compile_payload", "", LastFindingCode(findings), lockHandle.JobId);
             Directory.CreateDirectory(missionDir);
             Directory.CreateDirectory(Path.GetDirectoryName(payloadPath)!);
 
@@ -149,13 +151,14 @@ namespace BreachScenarioEngine.Mcp.Editor
             var artifacts = new List<string> { ToRepoPath(layoutPath), ToRepoPath(statePath) };
             if (!GenerationLockSet.TryAcquire(template.MissionId, missionDir, "generate_layout", out var generationLock, out var conflictPath, out var conflictFinding))
             {
-                findings.Add(conflictFinding!);
+                findings.Add(conflictFinding);
                 return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
             }
 
-            using (generationLock!)
+            var lockHandle = generationLock ?? throw new InvalidOperationException("Generation lock acquisition failed.");
+            using (lockHandle)
             {
-            WriteMissionState(missionDir, template.MissionId, "VALIDATING", "generate_layout", "", LastFindingCode(findings), generationLock.JobId);
+            WriteMissionState(missionDir, template.MissionId, "VALIDATING", "generate_layout", "", LastFindingCode(findings), lockHandle.JobId);
             Directory.CreateDirectory(missionDir);
             Directory.CreateDirectory(Path.GetDirectoryName(layoutPath)!);
 
@@ -255,13 +258,14 @@ namespace BreachScenarioEngine.Mcp.Editor
             var artifacts = new[] { ToRepoPath(layoutPath), ToRepoPath(entitiesPath), ToRepoPath(statePath) };
             if (!GenerationLockSet.TryAcquire(template.MissionId, missionDir, "place_entities", out var generationLock, out var conflictPath, out var conflictFinding))
             {
-                findings.Add(conflictFinding!);
+                findings.Add(conflictFinding);
                 return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
             }
 
-            using (generationLock!)
+            var lockHandle = generationLock ?? throw new InvalidOperationException("Generation lock acquisition failed.");
+            using (lockHandle)
             {
-            WriteMissionState(missionDir, template.MissionId, "LAYOUT_GENERATED", "place_entities", layoutRevisionId, LastFindingCode(findings), generationLock.JobId);
+            WriteMissionState(missionDir, template.MissionId, "LAYOUT_GENERATED", "place_entities", layoutRevisionId, LastFindingCode(findings), lockHandle.JobId);
             var placementNode = BuildEntityPlacementNode(template, layoutNode);
             Directory.CreateDirectory(Path.GetDirectoryName(entitiesPath)!);
             File.WriteAllText(entitiesPath, placementNode.ToJsonString() + Environment.NewLine);
@@ -302,13 +306,14 @@ namespace BreachScenarioEngine.Mcp.Editor
             var artifacts = new List<string> { ToRepoPath(payloadPath), ToRepoPath(layoutPath), ToRepoPath(entitiesPath), ToRepoPath(summaryPath), ToRepoPath(statePath) };
             if (!GenerationLockSet.TryAcquire(template.MissionId, missionDir, "verify", out var generationLock, out var conflictPath, out var conflictFinding))
             {
-                findings.Add(conflictFinding!);
+                findings.Add(conflictFinding);
                 return (false, MissionResultJson("FAIL", template.MissionId, artifacts, findings));
             }
 
-            using (generationLock!)
+            var lockHandle = generationLock ?? throw new InvalidOperationException("Generation lock acquisition failed.");
+            using (lockHandle)
             {
-            WriteMissionState(missionDir, template.MissionId, "VERIFYING", "verify", "", LastFindingCode(findings), generationLock.JobId);
+            WriteMissionState(missionDir, template.MissionId, "VERIFYING", "verify", "", LastFindingCode(findings), lockHandle.JobId);
             var layoutNode = ReadJsonObject(layoutPath);
             var entitiesNode = ReadJsonObject(entitiesPath);
             var payloadNode = ReadJsonObject(payloadPath);
@@ -1782,13 +1787,13 @@ namespace BreachScenarioEngine.Mcp.Editor
                 string currentStep,
                 out GenerationLockSet? lockSet,
                 out string? conflictPath,
-                out JsonObject? conflictFinding)
+                out JsonObject conflictFinding)
             {
                 var path = GenerationLockPath(missionDir);
                 var jobId = Guid.NewGuid().ToString("N");
                 lockSet = null;
                 conflictPath = null;
-                conflictFinding = null;
+                conflictFinding = new JsonObject();
                 try
                 {
                     Directory.CreateDirectory(missionDir);
@@ -1953,7 +1958,12 @@ namespace BreachScenarioEngine.Mcp.Editor
         private static string ResolveMissionArtifactPath(string raw, string key, string missionDir, string fileName)
         {
             var arg = JsonArgString(raw, key);
-            return string.IsNullOrWhiteSpace(arg) ? Path.Combine(missionDir, fileName) : ToAbsoluteProjectPath(arg!);
+            if (string.IsNullOrWhiteSpace(arg))
+            {
+                return Path.Combine(missionDir, fileName);
+            }
+
+            return ToAbsoluteProjectPath(arg);
         }
 
         private static string ProjectRoot()
@@ -2044,7 +2054,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                 };
             }
 
-            public static bool TryLoad(string path, string? requestedMissionId, out MissionTemplateModel? template, out List<JsonObject> findings)
+            public static bool TryLoad(string path, string? requestedMissionId, out MissionTemplateModel template, out List<JsonObject> findings)
             {
                 template = new MissionTemplateModel();
                 findings = new List<JsonObject>();

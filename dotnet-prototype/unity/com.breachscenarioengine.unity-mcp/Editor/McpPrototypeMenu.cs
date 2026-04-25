@@ -5,6 +5,8 @@ using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
+#nullable enable
+
 namespace BreachScenarioEngine.Mcp.Editor
 {
     public static class McpPrototypeMenu

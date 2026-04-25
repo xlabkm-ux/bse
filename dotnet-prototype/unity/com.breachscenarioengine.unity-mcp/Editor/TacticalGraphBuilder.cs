@@ -281,6 +281,23 @@ namespace BreachScenarioEngine.Mcp.Editor
             return string.CompareOrdinal(a, b) <= 0 ? $"{a}|{b}" : $"{b}|{a}";
         }
 
+        private static JsonObject Finding(string severity, string code, string message, string? path = null)
+        {
+            var finding = new JsonObject
+            {
+                ["severity"] = severity,
+                ["code"] = code,
+                ["message"] = message
+            };
+
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                finding["path"] = path;
+            }
+
+            return finding;
+        }
+
         private sealed record RoomSnapshot(string Id, string NavNodeId, int X, int Y, int Width, int Height)
         {
             public int Right => X + Width;
