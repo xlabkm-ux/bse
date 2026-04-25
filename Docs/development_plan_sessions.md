@@ -264,7 +264,7 @@ Exit criteria:
 
 Status:
 
-- pending
+- completed
 
 Goal:
 
@@ -281,6 +281,27 @@ Work:
 - cleanup only generated-owned objects
 - preserve Windows 10/11 desktop and Android 1080p portrait/landscape
   assumptions with scalable UI
+
+Completed:
+
+- added `MissionSceneContext` with typed references for the grid, tilemaps,
+  generated roots, and debug roots
+- added `MissionSceneMaterializer` and refactored `MissionSceneBuilder` to
+  materialize generated layout and entity artifacts into a scene preview root
+- materialized Tilemap-backed world layers, generated doors/windows/covers,
+  actors, objectives, extraction preview, and ownership markers without using
+  `GameObject.Find`
+- updated the runtime smoke test to validate the context hierarchy and
+  generated tilemap roots
+- enabled the Unity Tilemap module in `Packages/manifest.json` so the runtime
+  preview layer compiles under the active editor target
+
+Verification:
+
+- Unity batchmode script compilation completed successfully against
+  `MissionSceneContext` and `MissionSceneMaterializer`
+- the direct `-runTests` invocation did not emit a new test XML report, so the
+  verification here is compile-level rather than a finished EditMode result
 
 Exit criteria:
 

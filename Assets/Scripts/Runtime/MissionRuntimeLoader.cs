@@ -75,6 +75,12 @@ namespace BreachScenarioEngine.Runtime
 
                 ClearCurrentRoot();
                 currentRoot = sceneBuilder.Build(config, manifest, layout, entities);
+                if (currentRoot == null)
+                {
+                    var report = sceneBuilder.LastReport;
+                    return Fail(report != null && !string.IsNullOrEmpty(report.message) ? report.message : "Scene materialization failed for " + config.MissionId);
+                }
+
                 return true;
             }
             catch (Exception ex)

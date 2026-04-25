@@ -21,6 +21,8 @@ namespace BreachScenarioEngine.Runtime
         public string pipelineVersion = "";
         public string missionId = "";
         public string layoutRevisionId = "";
+        public MissionLayoutGenerator generator = new();
+        public MissionRetryPolicy retryPolicy = new();
         public LayoutGraphData LayoutGraph = new();
         public RoomGraphData RoomGraph = new();
         public PortalGraphData PortalGraph = new();
@@ -35,8 +37,41 @@ namespace BreachScenarioEngine.Runtime
         public string layoutRevisionId = "";
         public int[] bounds = Array.Empty<int>();
         public string theme = "";
+        public int ppu;
         public string entryRoomId = "";
         public string[] objectiveRoomIds = Array.Empty<string>();
+        public MissionBreachPoint[] breachPoints = Array.Empty<MissionBreachPoint>();
+    }
+
+    [Serializable]
+    public sealed class MissionLayoutGenerator
+    {
+        public string id = "";
+        public string sourcePayloadPath = "";
+        public int step;
+        public bool pureData;
+    }
+
+    [Serializable]
+    public sealed class MissionRetryPolicy
+    {
+        public int retryFromStep;
+        public string retryAction = "";
+        public int placementStep;
+    }
+
+    [Serializable]
+    public sealed class MissionBreachPoint
+    {
+        public string id = "";
+        public string layoutRevisionId = "";
+        public string roomId = "";
+        public string navNodeId = "";
+        public string kind = "";
+        public string side = "";
+        public float x;
+        public float y;
+        public float width;
     }
 
     [Serializable]
@@ -80,6 +115,9 @@ namespace BreachScenarioEngine.Runtime
         public string fromRoomId = "";
         public string toRoomId = "";
         public string kind = "";
+        public string orientation = "";
+        public float x;
+        public float y;
         public float width;
     }
 
@@ -98,6 +136,8 @@ namespace BreachScenarioEngine.Runtime
         public string roomId = "";
         public string navNodeId = "";
         public string quality = "";
+        public float x;
+        public float y;
     }
 
     [Serializable]
@@ -141,6 +181,8 @@ namespace BreachScenarioEngine.Runtime
         public string pipelineVersion = "";
         public string missionId = "";
         public string layoutRevisionId = "";
+        public int placementStep;
+        public int requiresLayoutStep;
         public MissionActorEntity[] actors = Array.Empty<MissionActorEntity>();
         public MissionObjectiveEntity[] objectives = Array.Empty<MissionObjectiveEntity>();
     }

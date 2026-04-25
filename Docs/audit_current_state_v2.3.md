@@ -101,6 +101,12 @@ Implemented:
   objectives with ownership, `roomId`, `navNodeId`, and `layoutRevisionId`.
 - `verify` writes `verification_summary.json` with machine-readable status,
   findings, and metrics.
+- `MissionSceneContext`, `MissionSceneMaterializer`, and
+  `MissionSceneBuilder` materialize generated layout and entity artifacts into
+  a preview scene root with typed grid, tilemap, and generated hierarchy
+  references.
+- `MissionRuntimeLoader` now loads accepted artifacts into the preview scene
+  without using `GameObject.Find`.
 - `write_manifest` reads verification status, retries retryable failures from
   layout generation, records retry seeds, stamps replay fields, and writes
   `generation_manifest.json`.
@@ -172,6 +178,7 @@ Direct dependencies in `Packages/manifest.json`:
 - `com.unity.render-pipelines.universal` `17.4.0`
 - `com.unity.test-framework` `1.6.0`
 - selected Unity modules, including Physics 2D, UIElements, and Vector Graphics
+- `com.unity.modules.tilemap` `1.0.0`
 
 Resolved dependencies in `Packages/packages-lock.json` include Burst and
 Collections transitively through Entities and URP. Addressables, Jobs, and

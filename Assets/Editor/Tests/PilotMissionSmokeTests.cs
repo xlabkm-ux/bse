@@ -3,6 +3,7 @@ using BreachScenarioEngine.Runtime;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 namespace BreachScenarioEngine.Editor.Tests
 {
@@ -54,6 +55,23 @@ namespace BreachScenarioEngine.Editor.Tests
                     Assert.IsTrue(loader.LoadMission(config!), loader.LastError);
                     Assert.NotNull(loader.CurrentRoot);
                     Assert.AreEqual("GeneratedMissionRoot_" + config!.MissionId, loader.CurrentRoot!.name);
+                    var context = loader.CurrentRoot.GetComponent<MissionSceneContext>();
+                    Assert.NotNull(context, "MissionSceneContext");
+                    Assert.NotNull(context!.Grid, "Grid");
+                    Assert.NotNull(context.BaseMap, "BaseMap");
+                    Assert.NotNull(context.CollisionMap, "CollisionMap");
+                    Assert.NotNull(context.DecorMap, "DecorMap");
+                    Assert.NotNull(context.InteractablesMap, "InteractablesMap");
+                    Assert.NotNull(context.DoorsRoot, "DoorsRoot");
+                    Assert.NotNull(context.WindowsRoot, "WindowsRoot");
+                    Assert.NotNull(context.CoversRoot, "CoversRoot");
+                    Assert.NotNull(context.EnemiesRoot, "EnemiesRoot");
+                    Assert.NotNull(context.OperativesRoot, "OperativesRoot");
+                    Assert.NotNull(context.ObjectivesRoot, "ObjectivesRoot");
+                    Assert.NotNull(context.HostagesRoot, "HostagesRoot");
+                    Assert.NotNull(context.ExtractionRoot, "ExtractionRoot");
+                    Assert.NotNull(context.DebugRoot, "DebugRoot");
+                    Assert.Greater(loader.CurrentRoot.GetComponentsInChildren<Tilemap>().Length, 0);
                     Assert.Greater(loader.CurrentRoot.GetComponentsInChildren<GeneratedOwnershipMarker>().Length, 0);
                     Assert.Greater(loader.CurrentRoot.GetComponentsInChildren<MissionCompleteTrigger>().Length, 0);
                 }
