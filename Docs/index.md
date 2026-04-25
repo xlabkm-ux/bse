@@ -5,6 +5,7 @@ Short entry point for the active Breach Scenario Engine MCP documentation.
 | Document | Purpose |
 |---|---|
 | [project_documentation.md](project_documentation.md) | Full map of the docs set and reading order |
+| [audit_current_state_v2.3.md](audit_current_state_v2.3.md) | Factual v2.3 baseline audit before stabilization work |
 | [breach_mcp_architecture_v2.2.md](breach_mcp_architecture_v2.2.md) | Technical architecture specification for the layout-first pipeline |
 | [mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md) | Authoring ownership and profile split |
 | [mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md) | Step 0-7 mission generation contract |
@@ -19,9 +20,10 @@ Short entry point for the active Breach Scenario Engine MCP documentation.
 ## Quick use
 
 1. Read [project_documentation.md](project_documentation.md) for the full map.
-2. Check [runtime_tools.md](runtime_tools.md) against [canonical_tools.md](canonical_tools.md).
-3. Read [breach_mcp_architecture_v2.2.md](breach_mcp_architecture_v2.2.md) for pipeline orchestration and retry rules.
-4. Read [mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md) before editing mission YAML.
-5. Read [mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md) before implementing generation code.
-6. Read [mission_data_contract_v2.2.md](mission_data_contract_v2.2.md) and [generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md) for runtime artifacts.
-7. Track remaining work in [development_plan_sessions.md](development_plan_sessions.md).
+2. Read [audit_current_state_v2.3.md](audit_current_state_v2.3.md) before v2.3 stabilization work.
+3. Check [runtime_tools.md](runtime_tools.md) against [canonical_tools.md](canonical_tools.md).
+4. Read [breach_mcp_architecture_v2.2.md](breach_mcp_architecture_v2.2.md) for pipeline orchestration and retry rules.
+5. Read [mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md) before editing mission YAML.
+6. Read [mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md) before implementing generation code.
+7. Read [mission_data_contract_v2.2.md](mission_data_contract_v2.2.md) and [generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md) for runtime artifacts.
+8. Track remaining work in [development_plan_sessions.md](development_plan_sessions.md).

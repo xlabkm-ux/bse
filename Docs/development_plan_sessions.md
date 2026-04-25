@@ -7,6 +7,133 @@ This document splits the mission pipeline work into handoff-friendly sessions.
 It is intended for switching between chats or resuming later without rebuilding
 the whole roadmap.
 
+## Active Continuation: v2.3 Stabilization
+
+The v2.2 mission pipeline sessions below are functionally complete. New chats
+should continue the v2.3 stabilization track unless the user asks for a
+different task.
+
+### v2.3 Session 1: Current-State Audit
+
+Status:
+
+- completed
+
+Goal:
+
+- record the factual repository state before changing v2.3 contracts or code
+
+Completed:
+
+- created `Docs/audit_current_state_v2.3.md`
+- linked the audit from the active docs index and project documentation
+- identified Must Fix / Should Fix / Nice To Have work for v2.3
+
+Handoff note:
+
+- "The v2.3 audit baseline is recorded. Please start by stabilizing the repo
+  owned v2.3 docs before changing runtime behavior."
+
+### v2.3 Session 2: Documentation Stabilization
+
+Status:
+
+- pending
+
+Goal:
+
+- create one repo-owned v2.3 documentation set and stop mixing the external
+  continuation plan with active v2.2 contracts
+
+Work:
+
+- create `Docs/breach_mcp_architecture_v2.3.md`
+- create `Docs/mission_pipeline_contract_v2.3.md`
+- create `Docs/mission_authoring_contract_v2.3.md`
+- create `Docs/mission_template_v2.3.md`
+- create `Docs/mission_data_contract_v2.3.md`
+- create `Docs/generation_manifest_contract_v2.3.md`
+- update `Docs/index.md`, `Docs/project_documentation.md`,
+  `Docs/runtime_tools.md`, `Docs/canonical_tools.md`, and this plan
+- decide the authoritative profile/catalog root before v2.3 validation work
+
+Exit criteria:
+
+- active docs have a single v2.3 reading path
+- v2.3 invariants are explicitly documented:
+  Step 6 before Step 5, retry to Step 6, manifest after PASS, JSON-only
+  machine decisions, and `effectiveSeed` only after PASS
+
+### v2.3 Session 3: Generation Locks and Lifecycle
+
+Status:
+
+- pending
+
+Goal:
+
+- align implementation with the v2.3 lock and mission lifecycle contract
+
+Work:
+
+- add mission-scoped `.generation.lock`
+- add `mission_state.json`
+- define lifecycle states and current-step updates
+- add safe unlock behavior, stale lock handling, and diagnostic cleanup
+- keep `write_manifest` blocked when lifecycle state is incompatible
+
+### v2.3 Session 4: Validation and Payload Fidelity
+
+Status:
+
+- pending
+
+Goal:
+
+- harden template validation and payload schema fidelity
+
+Work:
+
+- split validation findings into the v2.3 `TPL_*` code family
+- add invalid template fixtures
+- document or replace the current custom YAML subset parser
+- add repo-owned JSON Schema validation before payload write
+
+### v2.3 Session 5: Verification and Retry Hardening
+
+Status:
+
+- pending
+
+Goal:
+
+- expand verification metrics and make retry derivation match the v2.3 policy
+
+Work:
+
+- add v2.3 verification metrics and retryable/blocking classification
+- include failure code in retry seed derivation if retained by contract
+- preserve Step 6 -> Step 5 -> Step 7 on every retry
+
+### v2.3 Session 6: Unity Package and Content Layer
+
+Status:
+
+- pending
+
+Goal:
+
+- align Unity dependencies, Addressables, profiles, and catalogs with the
+  v2.3 target architecture
+
+Work:
+
+- resolve direct package dependency decisions for Addressables, Burst,
+  Collections, Jobs, and AI Assistant
+- align embedded package metadata with Unity `6000.4.3f1`
+- add typed profiles and catalogs after the docs choose an authoritative path
+- validate Addressables labels and profile versions
+
 ## Current State
 
 Completed:
@@ -265,6 +392,7 @@ Before switching chats:
 
 ## Anchor Files
 
+- [Docs/audit_current_state_v2.3.md](audit_current_state_v2.3.md)
 - [Docs/mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md)
 - [Docs/mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md)
 - [Docs/mission_data_contract_v2.2.md](mission_data_contract_v2.2.md)

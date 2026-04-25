@@ -7,6 +7,7 @@ Active project documentation for the Breach Scenario Engine mission pipeline.
 - [workspace_index.md](workspace_index.md)
 - [index.md](index.md)
 - [project_documentation.md](project_documentation.md)
+- [audit_current_state_v2.3.md](audit_current_state_v2.3.md)
 - [breach_mcp_architecture_v2.2.md](breach_mcp_architecture_v2.2.md)
 - [mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md)
 - [mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md)

@@ -1,6 +1,6 @@
 # Breach Scenario Engine Project Documentation
 
-Date: 2026-04-07
+Date: 2026-04-25
 Project: `Breach Scenario Engine`
 
 This document is the map for the active documentation set. It intentionally
@@ -23,6 +23,9 @@ MCP backlog and generic bridge workflow notes are not part of the active docs.
 
 - [Docs/workspace_index.md](workspace_index.md)
   - Code and data location map
+
+- [Docs/audit_current_state_v2.3.md](audit_current_state_v2.3.md)
+  - Factual baseline before v2.3 stabilization work
 
 ### Current MCP tools
 
@@ -64,13 +67,14 @@ MCP backlog and generic bridge workflow notes are not part of the active docs.
 
 1. [README.md](../README.md)
 2. [Docs/index.md](index.md)
-3. [Docs/canonical_tools.md](canonical_tools.md)
-4. [Docs/runtime_tools.md](runtime_tools.md)
-5. [Docs/mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md)
-6. [Docs/mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md)
-7. [Docs/mission_data_contract_v2.2.md](mission_data_contract_v2.2.md)
-8. [Docs/generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md)
-9. [Docs/development_plan_sessions.md](development_plan_sessions.md)
+3. [Docs/audit_current_state_v2.3.md](audit_current_state_v2.3.md)
+4. [Docs/canonical_tools.md](canonical_tools.md)
+5. [Docs/runtime_tools.md](runtime_tools.md)
+6. [Docs/mission_authoring_contract_v2.2.md](mission_authoring_contract_v2.2.md)
+7. [Docs/mission_pipeline_contract_v2.2.md](mission_pipeline_contract_v2.2.md)
+8. [Docs/mission_data_contract_v2.2.md](mission_data_contract_v2.2.md)
+9. [Docs/generation_manifest_contract_v2.2.md](generation_manifest_contract_v2.2.md)
+10. [Docs/development_plan_sessions.md](development_plan_sessions.md)
 
 ## 3. Runtime Snapshot
 
