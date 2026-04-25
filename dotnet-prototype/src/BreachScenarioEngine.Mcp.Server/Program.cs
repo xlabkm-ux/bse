@@ -384,7 +384,7 @@ public sealed class McpRequestDispatcher
         var cs = Path.Combine(scripts, "GameBootstrap.cs");
         Directory.CreateDirectory(scenes); Directory.CreateDirectory(scripts);
         if (!force && (File.Exists(md) || File.Exists(cs))) return Err("Bootstrap files exist. Use force=true");
-        File.WriteAllText(md, "# Bootstrap2DURP\n\n- Main Camera\n- Global Light 2D\n- Player\n", Encoding.UTF8);
+        File.WriteAllText(md, "# Bootstrap2DURP\n\n- Main Camera\n- Player\n", Encoding.UTF8);
         File.WriteAllText(cs, "using UnityEngine;\npublic sealed class GameBootstrap : MonoBehaviour { void Start(){} }\n", Encoding.UTF8);
         return Ok($"Bootstrap scaffold created: {md}; {cs}");
     }

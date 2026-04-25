@@ -49,9 +49,6 @@ MissionSceneRoot
     Hostages
     Extraction
     Debug
-
-  NavigationRoot
-  LightingRoot
 ```
 
 `MissionSceneContext` owns serialized references to these roots and components.
@@ -127,6 +124,8 @@ Required behavior:
 - vertical-wall doors rotate 0 degrees
 - external entry doors are marked as breach or entry points when the layout
   graph says so
+- breach points clear collision using deterministic tile-rounding rules from
+  their `side` and `width` data
 
 The materializer must not infer authoritative portal topology from the scene.
 The portal graph owns that topology.
@@ -141,6 +140,8 @@ Required behavior:
 - windows are allowed only on external walls unless a future contract adds
   interior windows
 - windows do not create actor placement by themselves
+- windows stay visual-only in materialization unless a future contract adds an
+  explicit breachable flag or equivalent field
 - window visual assets come from the environment catalog
 - missing window assets are validation/materialization findings
 

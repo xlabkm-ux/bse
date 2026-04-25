@@ -130,8 +130,8 @@ GameObject:
   - component: {fileID: 306577170}
   - component: {fileID: 306577169}
   m_Layer: 0
-  m_Name: Camera2D
-  m_TagString: Untagged
+  m_Name: Main Camera
+  m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -231,7 +231,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5b395652ff1aa9a498d8d03875ea3ae0, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::BreachScenarioEngine.Runtime.PilotMissionSelector
   loader: {fileID: 685425704}
   missions:

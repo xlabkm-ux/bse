@@ -95,7 +95,8 @@ namespace BreachScenarioEngine.Editor.Tools
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             scene.name = "MissionBootstrap";
 
-            var cameraObject = new GameObject("Camera2D");
+            var cameraObject = new GameObject("Main Camera");
+            cameraObject.tag = "MainCamera";
             var camera = cameraObject.AddComponent<Camera>();
             camera.orthographic = true;
             camera.orthographicSize = 8f;
