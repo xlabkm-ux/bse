@@ -20,6 +20,7 @@ namespace BreachScenarioEngine.Mcp.Editor
         private const string PipelineVersion = "2.3";
         private const string TemplateSchemaVersion = "tb.mission_template.v2.3";
         private const string PayloadSchemaVersion = "bse.mission_payload.v2.3";
+        private const string PayloadSchemaRelativePath = "dotnet-prototype/contracts/mission_payload_v2.3.schema.json";
         private const string LockOwner = "manage_mission";
         private static readonly HashSet<string> TacticalThemes = new(StringComparer.Ordinal) { "urban_cqb", "stealth_facility", "residential" };
         private static readonly HashSet<string> NavigationPolicies = new(StringComparer.Ordinal) { "FullAccess", "StaticGuard", "CanOpenDoors", "Immobilized" };
@@ -106,6 +107,7 @@ namespace BreachScenarioEngine.Mcp.Editor
 
             var payloadNode = BuildPayloadNode(template!);
             var payloadFindings = ValidatePayloadShape(payloadNode);
+            ValidateProfileRefs(payloadNode, payloadFindings);
             findings.AddRange(payloadFindings);
             if (payloadFindings.Any(f => f["severity"]?.GetValue<string>() == "error"))
             {
@@ -1391,81 +1393,241 @@ namespace BreachScenarioEngine.Mcp.Editor
         private static List<JsonObject> ValidatePayloadShape(JsonObject payload)
         {
             var findings = new List<JsonObject>();
-            RequireAllowedKeys(payload, "payload", new[] { "header", "spatial", "logic", "roster", "objectives", "profileRefs" }, findings);
-            var header = RequiredPayloadObject(payload, "header", findings);
-            var spatial = RequiredPayloadObject(payload, "spatial", findings);
-            var logic = RequiredPayloadObject(payload, "logic", findings);
-            RequiredPayloadArray(payload, "roster", findings);
-            var objectives = RequiredPayloadObject(payload, "objectives", findings);
-            var profileRefs = RequiredPayloadObject(payload, "profileRefs", findings);
-
-            if (header != null)
+            var schema = LoadPayloadSchema();
+            if (schema == null)
             {
-                RequireAllowedKeys(header, "header", new[] { "schemaVersion", "pipelineVersion", "missionId", "missionTitle", "initialSeed", "effectiveSeed", "layoutRevisionId" }, findings);
-                RequiredPayloadString(header, "schemaVersion", PayloadSchemaVersion, findings);
-                RequiredPayloadString(header, "pipelineVersion", PipelineVersion, findings);
-                RequiredPayloadString(header, "missionId", null, findings);
-                RequiredPayloadInteger(header, "initialSeed", 0, findings);
-                RequiredPayloadInteger(header, "effectiveSeed", 0, findings);
+                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Missing payload schema file: {PayloadSchemaRelativePath}"));
+                return findings;
             }
 
-            if (spatial != null)
-            {
-                RequireAllowedKeys(spatial, "spatial", new[] { "bounds", "theme", "ppu", "bsp" }, findings);
-                RequiredPayloadArray(spatial, "bounds", findings);
-                RequiredPayloadString(spatial, "theme", null, findings);
-                RequiredPayloadInteger(spatial, "ppu", 1, findings);
-                var bsp = RequiredPayloadObject(spatial, "bsp", findings);
-                if (bsp != null)
-                {
-                    RequireAllowedKeys(bsp, "spatial.bsp", new[] { "minRoomSize", "maxRoomSize", "corridorWidth", "forceAdjacency" }, findings);
-                    RequiredPayloadArray(bsp, "minRoomSize", findings);
-                    RequiredPayloadArray(bsp, "maxRoomSize", findings);
-                    RequiredPayloadInteger(bsp, "corridorWidth", 1, findings);
-                    RequiredPayloadBoolean(bsp, "forceAdjacency", findings);
-                }
-            }
-
-            if (logic != null)
-            {
-                RequireAllowedKeys(logic, "logic", new[] { "noise", "navigation" }, findings);
-                var noise = RequiredPayloadObject(logic, "noise", findings);
-                var navigation = RequiredPayloadObject(logic, "navigation", findings);
-                if (noise != null)
-                {
-                    RequireAllowedKeys(noise, "logic.noise", new[] { "threshold", "wallMultiplier", "doorPenalty" }, findings);
-                    RequiredPayloadNumber(noise, "threshold", findings);
-                    RequiredPayloadNumber(noise, "wallMultiplier", findings);
-                    RequiredPayloadNumber(noise, "doorPenalty", findings);
-                }
-
-                if (navigation != null)
-                {
-                    RequireAllowedKeys(navigation, "logic.navigation", new[] { "strict" }, findings);
-                    RequiredPayloadBoolean(navigation, "strict", findings);
-                }
-            }
-
-            if (objectives != null)
-            {
-                RequireAllowedKeys(objectives, "objectives", new[] { "primary", "secondary" }, findings);
-                RequiredPayloadArray(objectives, "primary", findings);
-            }
-
-            if (profileRefs != null)
-            {
-                RequireAllowedKeys(profileRefs, "profileRefs", new[]
-                {
-                    "tacticalThemeProfile",
-                    "performanceProfile",
-                    "renderProfile",
-                    "navigationPolicy",
-                    "tacticalDensityProfile",
-                    "addressablesCatalogProfile"
-                }, findings);
-            }
-
+            ValidateJsonSchema(payload, schema, "$", schema, findings);
             return findings;
+        }
+
+        private static JsonObject? LoadPayloadSchema()
+        {
+            var schemaPath = ResolvePayloadSchemaPath();
+            if (schemaPath == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return JsonNode.Parse(File.ReadAllText(schemaPath)) as JsonObject;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static string? ResolvePayloadSchemaPath()
+        {
+            var candidates = new[]
+            {
+                Path.Combine(ProjectRoot(), PayloadSchemaRelativePath),
+                Path.Combine(Application.dataPath, "..", PayloadSchemaRelativePath),
+                Path.Combine(Directory.GetCurrentDirectory(), PayloadSchemaRelativePath)
+            };
+
+            foreach (var path in candidates.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (File.Exists(path))
+                {
+                    return path;
+                }
+            }
+
+            return null;
+        }
+
+        private static void ValidateJsonSchema(JsonNode? instance, JsonObject schema, string path, JsonObject rootSchema, List<JsonObject> findings)
+        {
+            if (schema["$ref"] is JsonValue referenceValue && referenceValue.TryGetValue<string>(out var reference))
+            {
+                schema = ResolveSchemaReference(rootSchema, reference, path, findings);
+                if (schema == null)
+                {
+                    return;
+                }
+            }
+
+            if (schema["const"] is JsonNode constNode && !JsonNodeDeepEquals(instance, constNode))
+            {
+                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload value at {path} must match the schema const"));
+                return;
+            }
+
+            var typeName = schema["type"]?.GetValue<string>();
+            if (!string.IsNullOrWhiteSpace(typeName) && !MatchesSchemaType(instance, typeName!))
+            {
+                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload value at {path} must be of type {typeName}"));
+                return;
+            }
+
+            if (schema["enum"] is JsonArray enumValues && enumValues.Count > 0)
+            {
+                var match = enumValues.Any(node => JsonNodeDeepEquals(instance, node));
+                if (!match)
+                {
+                    findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload value at {path} has an unsupported enum value"));
+                    return;
+                }
+            }
+
+            if (instance is JsonObject obj)
+            {
+                ValidateObjectSchema(obj, schema, path, rootSchema, findings);
+            }
+            else if (instance is JsonArray array)
+            {
+                ValidateArraySchema(array, schema, path, rootSchema, findings);
+            }
+            else if (instance is JsonValue value)
+            {
+                ValidateScalarSchema(value, schema, path, findings);
+            }
+        }
+
+        private static void ValidateObjectSchema(JsonObject obj, JsonObject schema, string path, JsonObject rootSchema, List<JsonObject> findings)
+        {
+            var allowedProperties = schema["properties"] as JsonObject ?? new JsonObject();
+            var required = schema["required"] as JsonArray ?? new JsonArray();
+            var additionalProperties = schema["additionalProperties"]?.GetValue<bool?>() ?? true;
+
+            foreach (var req in required.OfType<JsonValue>())
+            {
+                var key = req.GetValue<string>();
+                if (!obj.ContainsKey(key))
+                {
+                    findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload missing required field: {path}.{key}"));
+                }
+            }
+
+            foreach (var kv in obj)
+            {
+                if (!allowedProperties.TryGetPropertyValue(kv.Key, out var propertySchemaNode) || propertySchemaNode is not JsonObject propertySchema)
+                {
+                    if (!additionalProperties)
+                    {
+                        findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload has unknown field: {path}.{kv.Key}"));
+                    }
+
+                    continue;
+                }
+
+                ValidateJsonSchema(kv.Value, propertySchema, $"{path}.{kv.Key}", rootSchema, findings);
+            }
+        }
+
+        private static void ValidateArraySchema(JsonArray array, JsonObject schema, string path, JsonObject rootSchema, List<JsonObject> findings)
+        {
+            if (schema["minItems"] is JsonValue minItemsValue && minItemsValue.TryGetValue<int>(out var minItems) && array.Count < minItems)
+            {
+                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload array at {path} must contain at least {minItems} items"));
+            }
+
+            if (schema["maxItems"] is JsonValue maxItemsValue && maxItemsValue.TryGetValue<int>(out var maxItems) && array.Count > maxItems)
+            {
+                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload array at {path} must contain at most {maxItems} items"));
+            }
+
+            JsonObject? itemSchema = null;
+            if (schema["items"] is JsonObject inlineItemSchema)
+            {
+                itemSchema = inlineItemSchema;
+            }
+            else if (schema["items"] is JsonValue itemRefValue && itemRefValue.TryGetValue<string>(out var itemReference))
+            {
+                itemSchema = ResolveSchemaReference(rootSchema, itemReference, path, findings);
+            }
+
+            if (itemSchema == null)
+            {
+                return;
+            }
+
+            for (var i = 0; i < array.Count; i++)
+            {
+                ValidateJsonSchema(array[i], itemSchema, $"{path}[{i}]", rootSchema, findings);
+            }
+        }
+
+        private static void ValidateScalarSchema(JsonValue value, JsonObject schema, string path, List<JsonObject> findings)
+        {
+            if (schema["pattern"] is JsonValue patternValue && patternValue.TryGetValue<string>(out var pattern))
+            {
+                var text = value.GetValue<string>() ?? string.Empty;
+                if (!Regex.IsMatch(text, pattern))
+                {
+                    findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload value at {path} does not match the required pattern"));
+                }
+            }
+
+            if (schema["minimum"] is JsonValue minimumValue && minimumValue.TryGetValue<double>(out var minimum))
+            {
+                if (value.TryGetValue<double>(out var number) && number < minimum)
+                {
+                    findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload value at {path} must be >= {minimum.ToString(CultureInfo.InvariantCulture)}"));
+                }
+            }
+
+            if (schema["maximum"] is JsonValue maximumValue && maximumValue.TryGetValue<double>(out var maximum))
+            {
+                if (value.TryGetValue<double>(out var number) && number > maximum)
+                {
+                    findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Generated payload value at {path} must be <= {maximum.ToString(CultureInfo.InvariantCulture)}"));
+                }
+            }
+        }
+
+        private static JsonObject? ResolveSchemaReference(JsonObject rootSchema, string reference, string path, List<JsonObject> findings)
+        {
+            if (!reference.StartsWith("#/", StringComparison.Ordinal))
+            {
+                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Unsupported schema reference at {path}: {reference}"));
+                return null;
+            }
+
+            JsonNode? current = rootSchema;
+            foreach (var token in reference.Substring(2).Split('/', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (current is JsonObject currentObject && currentObject.TryGetPropertyValue(token, out var next))
+                {
+                    current = next;
+                    continue;
+                }
+
+                findings.Add(Finding("error", "PAYLOAD_SCHEMA_INVALID", $"Unresolved schema reference at {path}: {reference}"));
+                return null;
+            }
+
+            return current as JsonObject;
+        }
+
+        private static bool MatchesSchemaType(JsonNode? instance, string expectedType)
+        {
+            return expectedType switch
+            {
+                "object" => instance is JsonObject,
+                "array" => instance is JsonArray,
+                "string" => instance is JsonValue valueString && valueString.TryGetValue<string>(out _),
+                "integer" => instance is JsonValue valueInt && valueInt.TryGetValue<int>(out _),
+                "number" => instance is JsonValue valueNumber && valueNumber.TryGetValue<double>(out _),
+                "boolean" => instance is JsonValue valueBool && valueBool.TryGetValue<bool>(out _),
+                _ => true
+            };
+        }
+
+        private static bool JsonNodeDeepEquals(JsonNode? left, JsonNode? right)
+        {
+            if (left == null || right == null)
+            {
+                return left == right;
+            }
+
+            return string.Equals(left.ToJsonString(), right.ToJsonString(), StringComparison.Ordinal);
         }
 
         private static JsonObject? RequiredPayloadObject(JsonObject obj, string key, List<JsonObject> findings)
@@ -1934,6 +2096,10 @@ namespace BreachScenarioEngine.Mcp.Editor
             public bool EnforcePostLayoutPlacement { get; private set; }
             public double WallMultiplier { get; private set; }
             public double DoorPenalty { get; private set; }
+            public bool HasProfileRefsSection { get; private set; }
+            public bool HasCatalogRefsSection { get; private set; }
+            public Dictionary<string, string> ProfileRefsMap { get; } = new(StringComparer.Ordinal);
+            public Dictionary<string, string> CatalogRefsMap { get; } = new(StringComparer.Ordinal);
             public List<MissionActor> Actors { get; } = new();
             public List<MissionObjective> PrimaryObjectives { get; } = new();
             public List<MissionObjective> SecondaryObjectives { get; } = new();
@@ -1943,7 +2109,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             public JsonObject ProfileRefs()
             {
                 const string root = "Assets/Data/Mission/Profiles";
-                return new JsonObject
+                var result = new JsonObject
                 {
                     ["tacticalThemeProfile"] = $"{root}/TacticalThemeProfile.asset",
                     ["performanceProfile"] = $"{root}/PerformanceProfile.asset",
@@ -1952,6 +2118,12 @@ namespace BreachScenarioEngine.Mcp.Editor
                     ["tacticalDensityProfile"] = $"{root}/TacticalDensityProfile.asset",
                     ["addressablesCatalogProfile"] = $"{root}/AddressablesCatalogProfile.asset"
                 };
+                foreach (var kv in ProfileRefsMap)
+                {
+                    result[kv.Key] = kv.Value;
+                }
+
+                return result;
             }
 
             public static bool TryLoad(string path, string? requestedMissionId, out MissionTemplateModel? template, out List<JsonObject> findings)
@@ -2002,9 +2174,17 @@ namespace BreachScenarioEngine.Mcp.Editor
                         objectiveSection = "";
                         currentActor = null;
                         currentObjective = null;
-                        if (!new[] { "generationMeta", "spatialConstraints", "tacticalRules", "actorRoster", "objectives" }.Contains(section, StringComparer.Ordinal))
+                        if (section == "profileRefs")
                         {
-                            findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown top-level section: {section}", pathPrefix));
+                            template.HasProfileRefsSection = true;
+                        }
+                        else if (section == "catalogRefs")
+                        {
+                            template.HasCatalogRefsSection = true;
+                        }
+                        if (!new[] { "generationMeta", "spatialConstraints", "tacticalRules", "profileRefs", "catalogRefs", "actorRoster", "objectives" }.Contains(section, StringComparer.Ordinal))
+                        {
+                            findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown top-level section: {section}", pathPrefix));
                         }
                         continue;
                     }
@@ -2031,7 +2211,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                             objectiveSection = subsection;
                             if (objectiveSection != "primary" && objectiveSection != "secondary")
                             {
-                                findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown objectives section: {objectiveSection}", pathPrefix));
+                                findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown objectives section: {objectiveSection}", pathPrefix));
                             }
                         }
                         continue;
@@ -2082,6 +2262,12 @@ namespace BreachScenarioEngine.Mcp.Editor
                         continue;
                     }
 
+                    if (section == "profileRefs" || section == "catalogRefs")
+                    {
+                        SetReference(template, section, line, findings, pathPrefix);
+                        continue;
+                    }
+
                     SetSectionScalar(template, section, subsection, line, findings, pathPrefix);
                 }
 
@@ -2097,7 +2283,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                     case "schemaVersion": template.SchemaVersion = template.MarkedString(value, "schemaVersion", findings, path); break;
                     case "missionId": template.MissionId = template.MarkedString(value, "missionId", findings, path); break;
                     case "missionTitle": template.MissionTitle = template.MarkedString(value, "missionTitle", findings, path); break;
-                    default: findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown top-level field: {key}", path)); break;
+                    default: findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown top-level field: {key}", path)); break;
                 }
             }
 
@@ -2111,7 +2297,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                         else if (key == "effectiveSeed") template.EffectiveSeed = template.MarkedInt(value, "generationMeta.effectiveSeed", findings, path);
                         else if (key == "generationTimeout") template.GenerationTimeout = template.MarkedInt(value, "generationMeta.generationTimeout", findings, path);
                         else if (key == "maxRetries") template.MaxRetries = template.MarkedInt(value, "generationMeta.maxRetries", findings, path);
-                        else findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown generationMeta field: {key}", path));
+                        else findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown generationMeta field: {key}", path));
                         break;
                     case "spatialConstraints":
                         if (key == "worldBounds") template.WorldBounds = template.MarkedIntList(value, "spatialConstraints.worldBounds", findings, path);
@@ -2121,7 +2307,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                         else if (subsection == "bspConstraints" && key == "maxRoomSize") template.MaxRoomSize = template.MarkedIntList(value, "spatialConstraints.bspConstraints.maxRoomSize", findings, path);
                         else if (subsection == "bspConstraints" && key == "corridorWidth") template.CorridorWidth = template.MarkedInt(value, "spatialConstraints.bspConstraints.corridorWidth", findings, path);
                         else if (subsection == "bspConstraints" && key == "forceRoomAdjacency") template.ForceRoomAdjacency = template.MarkedBool(value, "spatialConstraints.bspConstraints.forceRoomAdjacency", findings, path);
-                        else findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown spatialConstraints field: {key}", path));
+                        else findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown spatialConstraints field: {key}", path));
                         break;
                     case "tacticalRules":
                         if (key == "noiseAlertThreshold") template.NoiseAlertThreshold = template.MarkedDouble(value, "tacticalRules.noiseAlertThreshold", findings, path);
@@ -2129,10 +2315,16 @@ namespace BreachScenarioEngine.Mcp.Editor
                         else if (key == "enforcePostLayoutPlacement") template.EnforcePostLayoutPlacement = template.MarkedBool(value, "tacticalRules.enforcePostLayoutPlacement", findings, path);
                         else if (subsection == "acousticOcclusion" && key == "wallMultiplier") template.WallMultiplier = template.MarkedDouble(value, "tacticalRules.acousticOcclusion.wallMultiplier", findings, path);
                         else if (subsection == "acousticOcclusion" && key == "doorPenalty") template.DoorPenalty = template.MarkedDouble(value, "tacticalRules.acousticOcclusion.doorPenalty", findings, path);
-                        else findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown tacticalRules field: {key}", path));
+                        else findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown tacticalRules field: {key}", path));
+                        break;
+                    case "profileRefs":
+                        SetReference(template, "profileRefs", line, findings, path);
+                        break;
+                    case "catalogRefs":
+                        SetReference(template, "catalogRefs", line, findings, path);
                         break;
                     default:
-                        findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Field is not in a known section: {key}", path));
+                        findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Field is not in a known section: {key}", path));
                         break;
                 }
             }
@@ -2147,7 +2339,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                     case "countRange": actor.CountRange = ParseIntList(value, "actorRoster[].countRange", findings, path); break;
                     case "navigationPolicy": actor.NavigationPolicy = ParseString(value, "actorRoster[].navigationPolicy", findings, path); break;
                     case "placementPolicy": actor.PlacementPolicy = ParseString(value, "actorRoster[].placementPolicy", findings, path); break;
-                    default: findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown actor field: {key}", path)); break;
+                    default: findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown actor field: {key}", path)); break;
                 }
             }
 
@@ -2161,7 +2353,48 @@ namespace BreachScenarioEngine.Mcp.Editor
                     case "requiresLayoutGraph": objective.RequiresLayoutGraph = ParseBool(value, "objectives[].requiresLayoutGraph", findings, path); break;
                     case "targetRoomTag": objective.TargetRoomTag = ParseString(value, "objectives[].targetRoomTag", findings, path); break;
                     case "optional": objective.Optional = ParseBool(value, "objectives[].optional", findings, path); break;
-                    default: findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unknown objective field: {key}", path)); break;
+                    default: findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown objective field: {key}", path)); break;
+                }
+            }
+
+            private static void SetReference(MissionTemplateModel template, string section, string line, List<JsonObject> findings, string path)
+            {
+                var (key, value) = KeyValue(line);
+                var normalized = ParseString(value, $"{section}.{key}", findings, path);
+                if (string.IsNullOrWhiteSpace(normalized))
+                {
+                    return;
+                }
+
+                if (section == "profileRefs")
+                {
+                    if (!new[]
+                        {
+                            "tacticalThemeProfile",
+                            "performanceProfile",
+                            "renderProfile",
+                            "navigationPolicy",
+                            "tacticalDensityProfile",
+                            "addressablesCatalogProfile"
+                        }.Contains(key, StringComparer.Ordinal))
+                    {
+                        findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown profileRefs field: {key}", path));
+                        return;
+                    }
+
+                    template.ProfileRefsMap[key] = normalized;
+                    return;
+                }
+
+                if (section == "catalogRefs")
+                {
+                    if (!new[] { "enemyCatalog", "environmentCatalog", "objectiveCatalog" }.Contains(key, StringComparer.Ordinal))
+                    {
+                        findings.Add(Finding("error", "TPL_UNKNOWN_FIELD", $"Unknown catalogRefs field: {key}", path));
+                        return;
+                    }
+
+                    template.CatalogRefsMap[key] = normalized;
                 }
             }
 
@@ -2185,8 +2418,15 @@ namespace BreachScenarioEngine.Mcp.Editor
                 Required(template._seenFields.Contains("tacticalRules.enforcePostLayoutPlacement"), "tacticalRules.enforcePostLayoutPlacement", findings);
                 Required(template._seenFields.Contains("tacticalRules.acousticOcclusion.wallMultiplier"), "tacticalRules.acousticOcclusion.wallMultiplier", findings);
                 Required(template._seenFields.Contains("tacticalRules.acousticOcclusion.doorPenalty"), "tacticalRules.acousticOcclusion.doorPenalty", findings);
-                Required(template.Actors.Count > 0, "actorRoster", findings);
-                Required(template.PrimaryObjectives.Count > 0, "objectives.primary", findings);
+                if (template.Actors.Count == 0)
+                {
+                    findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", "actorRoster must contain at least one actor"));
+                }
+
+                if (template.PrimaryObjectives.Count == 0)
+                {
+                    findings.Add(Finding("error", "TPL_OBJECTIVE_INVALID", "objectives.primary must contain at least one objective"));
+                }
 
                 if (template.SchemaVersion != TemplateSchemaVersion)
                 {
@@ -2210,7 +2450,7 @@ namespace BreachScenarioEngine.Mcp.Editor
 
                 if (template.PixelsPerUnit != 128 && template.PixelsPerUnit != 256)
                 {
-                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", "spatialConstraints.pixelsPerUnit must be 128 or 256"));
+                    findings.Add(Finding("error", "TPL_RANGE_INVALID", "spatialConstraints.pixelsPerUnit must be 128 or 256"));
                 }
 
                 RangeAtLeast(template.InitialSeed, 0, "generationMeta.initialSeed", findings);
@@ -2229,9 +2469,26 @@ namespace BreachScenarioEngine.Mcp.Editor
                 {
                     if (template.MinRoomSize[0] > template.MaxRoomSize[0] || template.MinRoomSize[1] > template.MaxRoomSize[1])
                     {
-                        findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", "minRoomSize must be less than or equal to maxRoomSize"));
+                        findings.Add(Finding("error", "TPL_RANGE_INVALID", "minRoomSize must be less than or equal to maxRoomSize"));
                     }
                 }
+
+                ValidateReferenceSection(template.HasProfileRefsSection, template.ProfileRefsMap, new[]
+                {
+                    "tacticalThemeProfile",
+                    "performanceProfile",
+                    "renderProfile",
+                    "navigationPolicy",
+                    "tacticalDensityProfile",
+                    "addressablesCatalogProfile"
+                }, "profileRefs", "TPL_PROFILE_REF_MISSING", findings);
+
+                ValidateReferenceSection(template.HasCatalogRefsSection, template.CatalogRefsMap, new[]
+                {
+                    "enemyCatalog",
+                    "environmentCatalog",
+                    "objectiveCatalog"
+                }, "catalogRefs", "TPL_PROFILE_REF_MISSING", findings);
 
                 ValidateActors(template.Actors, findings);
                 ValidateObjectives(template.PrimaryObjectives, "objectives.primary", findings);
@@ -2244,32 +2501,56 @@ namespace BreachScenarioEngine.Mcp.Editor
                 var ids = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var actor in actors)
                 {
-                    Required(actor.Id, "actorRoster[].id", findings);
-                    Required(actor.Type, "actorRoster[].type", findings);
-                    Required(actor.NavigationPolicy, "actorRoster[].navigationPolicy", findings);
-                    Required(actor.PlacementPolicy, "actorRoster[].placementPolicy", findings);
-                    Required(actor.CountRange.Length == 2, "actorRoster[].countRange", findings);
+                    if (string.IsNullOrWhiteSpace(actor.Id))
+                    {
+                        findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", "actorRoster[].id is required"));
+                    }
+
+                    if (string.IsNullOrWhiteSpace(actor.Type))
+                    {
+                        findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", "actorRoster[].type is required"));
+                    }
+
+                    if (string.IsNullOrWhiteSpace(actor.NavigationPolicy))
+                    {
+                        findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", "actorRoster[].navigationPolicy is required"));
+                    }
+
+                    if (string.IsNullOrWhiteSpace(actor.PlacementPolicy))
+                    {
+                        findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", "actorRoster[].placementPolicy is required"));
+                    }
+
+                    if (actor.CountRange.Length != 2)
+                    {
+                        findings.Add(Finding("error", "TPL_RANGE_INVALID", "actorRoster[].countRange must contain exactly two integers"));
+                    }
+
                     if (!string.IsNullOrWhiteSpace(actor.Id) && !ids.Add(actor.Id))
                     {
-                        findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", $"Duplicate actor id: {actor.Id}"));
+                        findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", $"Duplicate actor id: {actor.Id}"));
                     }
 
                     if (!NavigationPolicies.Contains(actor.NavigationPolicy))
                     {
-                        findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unsupported actor navigationPolicy: {actor.NavigationPolicy}"));
+                        findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", $"Unsupported actor navigationPolicy: {actor.NavigationPolicy}"));
                     }
 
                     if (!PlacementPolicies.Contains(actor.PlacementPolicy))
                     {
-                        findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Unsupported actor placementPolicy: {actor.PlacementPolicy}"));
+                        findings.Add(Finding("error", "TPL_ACTOR_ROSTER_INVALID", $"Unsupported actor placementPolicy: {actor.PlacementPolicy}"));
                     }
 
                     if (actor.CountRange.Length == 2)
                     {
                         if (actor.CountRange[0] < 0 || actor.CountRange[1] < 0 || actor.CountRange[0] > actor.CountRange[1])
                         {
-                            findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"Invalid actor countRange for {actor.Id}"));
+                            findings.Add(Finding("error", "TPL_RANGE_INVALID", $"Invalid actor countRange for {actor.Id}"));
                         }
+                    }
+                    else
+                    {
+                        findings.Add(Finding("error", "TPL_RANGE_INVALID", $"actorRoster[].countRange must contain exactly two integers for {actor.Id}"));
                     }
                 }
             }
@@ -2279,16 +2560,53 @@ namespace BreachScenarioEngine.Mcp.Editor
                 var ids = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var objective in objectives)
                 {
-                    Required(objective.Id, $"{section}[].id", findings);
-                    Required(objective.Type, $"{section}[].type", findings);
+                    if (string.IsNullOrWhiteSpace(objective.Id))
+                    {
+                        findings.Add(Finding("error", "TPL_OBJECTIVE_INVALID", $"{section}[].id is required"));
+                    }
+
+                    if (string.IsNullOrWhiteSpace(objective.Type))
+                    {
+                        findings.Add(Finding("error", "TPL_OBJECTIVE_INVALID", $"{section}[].type is required"));
+                    }
+
                     if (!string.IsNullOrWhiteSpace(objective.Id) && !ids.Add(objective.Id))
                     {
-                        findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", $"Duplicate objective id: {objective.Id}"));
+                        findings.Add(Finding("error", "TPL_OBJECTIVE_INVALID", $"Duplicate objective id: {objective.Id}"));
                     }
 
                     if (objective.RequiresLayoutGraph == true && string.IsNullOrWhiteSpace(objective.TargetRoomTag))
                     {
-                        findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", $"{objective.Id} requires a targetRoomTag when requiresLayoutGraph is true"));
+                        findings.Add(Finding("error", "TPL_OBJECTIVE_INVALID", $"{objective.Id} requires a targetRoomTag when requiresLayoutGraph is true"));
+                    }
+                }
+            }
+
+            private static void ValidateReferenceSection(
+                bool sectionSeen,
+                IDictionary<string, string> refs,
+                IReadOnlyCollection<string> requiredKeys,
+                string sectionName,
+                string missingCode,
+                List<JsonObject> findings)
+            {
+                if (!sectionSeen)
+                {
+                    return;
+                }
+
+                foreach (var key in requiredKeys)
+                {
+                    if (!refs.TryGetValue(key, out var assetPath) || string.IsNullOrWhiteSpace(assetPath))
+                    {
+                        findings.Add(Finding("error", missingCode, $"Missing {sectionName}.{key}"));
+                        continue;
+                    }
+
+                    var absolutePath = ToAbsoluteProjectPath(assetPath);
+                    if (!IsUnderProjectRoot(absolutePath) || (!File.Exists(absolutePath) && AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) == null))
+                    {
+                        findings.Add(Finding("error", missingCode, $"{sectionName}.{key} does not resolve: {assetPath}", assetPath));
                     }
                 }
             }
@@ -2307,12 +2625,12 @@ namespace BreachScenarioEngine.Mcp.Editor
                 {
                     if (!string.IsNullOrWhiteSpace(objective.Id) && !ids.Add(objective.Id))
                     {
-                        findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", $"Duplicate objective id across objective sections: {objective.Id}"));
+                        findings.Add(Finding("error", "TPL_OBJECTIVE_INVALID", $"Duplicate objective id across objective sections: {objective.Id}"));
                     }
 
                     if (!string.IsNullOrWhiteSpace(objective.TargetRoomTag) && !knownRoomTags.Contains(objective.TargetRoomTag))
                     {
-                        findings.Add(Finding("error", "TPL_SEMANTIC_INVALID", $"Unknown objective targetRoomTag: {objective.TargetRoomTag}"));
+                        findings.Add(Finding("error", "TPL_OBJECTIVE_INVALID", $"Unknown objective targetRoomTag: {objective.TargetRoomTag}"));
                     }
                 }
             }
@@ -2321,7 +2639,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             {
                 if (values.Count == 2 && values.Any(v => v < 1))
                 {
-                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} values must be positive"));
+                    findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} values must be positive"));
                 }
             }
 
@@ -2329,7 +2647,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             {
                 if (value < minimum)
                 {
-                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} must be >= {minimum}"));
+                    findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} must be >= {minimum}"));
                 }
             }
 
@@ -2337,7 +2655,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             {
                 if (value < minimum)
                 {
-                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} must be >= {minimum.ToString(CultureInfo.InvariantCulture)}"));
+                    findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} must be >= {minimum.ToString(CultureInfo.InvariantCulture)}"));
                 }
             }
 
@@ -2345,7 +2663,7 @@ namespace BreachScenarioEngine.Mcp.Editor
             {
                 if (value < minimum || value > maximum)
                 {
-                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} must be between {minimum.ToString(CultureInfo.InvariantCulture)} and {maximum.ToString(CultureInfo.InvariantCulture)}"));
+                    findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} must be between {minimum.ToString(CultureInfo.InvariantCulture)} and {maximum.ToString(CultureInfo.InvariantCulture)}"));
                 }
             }
 
@@ -2363,7 +2681,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                     return result;
                 }
 
-                findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} must be an integer", path));
+                findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} must be an integer", path));
                 return 0;
             }
 
@@ -2375,7 +2693,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                     return result;
                 }
 
-                findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} must be a number", path));
+                findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} must be a number", path));
                 return 0;
             }
 
@@ -2407,7 +2725,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                 var trimmed = value.Trim();
                 if (!trimmed.StartsWith("[", StringComparison.Ordinal) || !trimmed.EndsWith("]", StringComparison.Ordinal))
                 {
-                    findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} must be an inline integer array", path));
+                    findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} must be an inline integer array", path));
                     return Array.Empty<int>();
                 }
 
@@ -2417,7 +2735,7 @@ namespace BreachScenarioEngine.Mcp.Editor
                 {
                     if (!int.TryParse(piece, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
                     {
-                        findings.Add(Finding("error", "TPL_SCHEMA_INVALID", $"{field} contains a non-integer value", path));
+                        findings.Add(Finding("error", "TPL_RANGE_INVALID", $"{field} contains a non-integer value", path));
                         return Array.Empty<int>();
                     }
 

@@ -38,12 +38,14 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
                 "schemaVersion: \"tb.mission_template.v2.3\"",
                 "missionId: \"VS99_Invalid\"",
                 "missionTitle: \"Invalid\"",
+                "unexpectedTopLevel: true",
                 "",
                 "generationMeta:",
                 "  initialSeed: -1",
                 "  effectiveSeed: 0",
                 "  generationTimeout: 45",
                 "  maxRetries: 5",
+                "  unsupportedSeedMode: \"random\"",
                 "",
                 "spatialConstraints:",
                 "  worldBounds: [64, 64]",
@@ -85,8 +87,10 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             Assert.AreEqual("FAIL", doc.RootElement.GetProperty("status").GetString());
             var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
             Assert.IsNotEmpty(findings);
-            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "TPL_SCHEMA_INVALID"));
-            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "TPL_SEMANTIC_INVALID"));
+            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "TPL_UNKNOWN_FIELD"));
+            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "TPL_RANGE_INVALID"));
+            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "TPL_OBJECTIVE_INVALID"));
+            Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == "TPL_ACTOR_ROSTER_INVALID"));
         }
 
         [Test]
@@ -107,11 +111,39 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
             using var doc = JsonDocument.Parse(message);
             var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
             Assert.IsTrue(findings.Any(f =>
-                f.GetProperty("code").GetString() == "TPL_SCHEMA_INVALID" &&
+                f.GetProperty("code").GetString() == "TPL_UNKNOWN_FIELD" &&
                 f.GetProperty("message").GetString().Contains("Unknown top-level field")));
             Assert.IsTrue(findings.Any(f =>
-                f.GetProperty("code").GetString() == "TPL_SCHEMA_INVALID" &&
+                f.GetProperty("code").GetString() == "TPL_UNKNOWN_FIELD" &&
                 f.GetProperty("message").GetString().Contains("Unknown generationMeta field")));
+        }
+
+        [Test]
+        public void ValidateTemplate_InvalidFixtures_EmitTargetedTplCodes()
+        {
+            var fixtures = new[]
+            {
+                (Path: Path.Combine(ProjectRoot(), "UserMissionSources", "missions", "_test_invalid_unknown_field", "mission_design.template.yaml"), Code: "TPL_UNKNOWN_FIELD"),
+                (Path: Path.Combine(ProjectRoot(), "UserMissionSources", "missions", "_test_invalid_range", "mission_design.template.yaml"), Code: "TPL_RANGE_INVALID"),
+                (Path: Path.Combine(ProjectRoot(), "UserMissionSources", "missions", "_test_invalid_profile_refs", "mission_design.template.yaml"), Code: "TPL_PROFILE_REF_MISSING"),
+                (Path: Path.Combine(ProjectRoot(), "UserMissionSources", "missions", "_test_invalid_actors_objectives", "mission_design.template.yaml"), Code: "TPL_ACTOR_ROSTER_INVALID")
+            };
+
+            foreach (var fixture in fixtures)
+            {
+                var (success, message) = MissionPipelineEditorService.Execute("validate_template", RawArgs(fixture.Path));
+                Assert.False(success, fixture.Path);
+                using var doc = JsonDocument.Parse(message);
+                var findings = doc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
+                Assert.IsTrue(findings.Any(f => f.GetProperty("code").GetString() == fixture.Code), fixture.Path);
+            }
+
+            var objectiveFixture = Path.Combine(ProjectRoot(), "UserMissionSources", "missions", "_test_invalid_actors_objectives", "mission_design.template.yaml");
+            var (objectiveSuccess, objectiveMessage) = MissionPipelineEditorService.Execute("validate_template", RawArgs(objectiveFixture));
+            Assert.False(objectiveSuccess, objectiveFixture);
+            using var objectiveDoc = JsonDocument.Parse(objectiveMessage);
+            var objectiveFindings = objectiveDoc.RootElement.GetProperty("findings").EnumerateArray().ToArray();
+            Assert.IsTrue(objectiveFindings.Any(f => f.GetProperty("code").GetString() == "TPL_OBJECTIVE_INVALID"), objectiveFixture);
         }
 
         [Test]

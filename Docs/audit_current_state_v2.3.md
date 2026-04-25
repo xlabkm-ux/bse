@@ -5,19 +5,20 @@ Project: `Breach Scenario Engine`
 Scope: repository, active docs, mission pipeline runtime, Unity package setup,
 and VS01 mission artifacts.
 
-This audit records the factual baseline before the v2.3 stabilization work. It
-does not change runtime behavior.
+This audit captures the factual repo state while v2.3 stabilization continues.
+It does not change runtime behavior.
 
 ## Summary
 
-The project has a working v2.2 vertical slice for `manage_mission` and the
-`VS01_HostageApartment` mission. The pipeline can validate, compile, generate
-layout graphs, place entities, verify, retry from layout on retryable failures,
-and write a manifest after verification passes.
+The project has a working mission-pipeline vertical slice for `manage_mission`
+and the `VS01_HostageApartment` mission. The pipeline can validate, compile,
+generate layout graphs, place entities, verify, retry from layout on retryable
+failures, and write a manifest after verification passes.
 
-The v2.3 plan is not yet reflected as an active contract set. The active docs,
-runtime constants, generated artifact schema versions, and Unity bridge tests
-still target v2.2.
+The active docs now point at the v2.3 contract set. Validation findings use the
+v2.3 `TPL_*` family, the payload compile step validates against a repo-owned
+JSON Schema file, and the remaining v2.3 gaps are concentrated in locks,
+retry-policy refinement, verification metrics, and content-layer alignment.
 
 ## Repository Structure
 
@@ -42,27 +43,21 @@ Not present yet:
 
 - `Assets/TacticalBreach/Profiles/`
 - `Assets/TacticalBreach/Catalogs/`
-- invalid template fixture missions under
-  `UserMissionSources/missions/_test_invalid_*`
-- v2.3 contract files under `Docs/`
+- typed catalog assets under `Assets/Data/Mission/Catalogs/`
 
 ## Active Documentation
 
-Current active docs are v2.2:
+Current active docs are v2.3:
 
-- `Docs/breach_mcp_architecture_v2.2.md`
-- `Docs/mission_authoring_contract_v2.2.md`
-- `Docs/mission_pipeline_contract_v2.2.md`
-- `Docs/mission_template_v2.2.md`
-- `Docs/mission_data_contract_v2.2.md`
-- `Docs/generation_manifest_contract_v2.2.md`
+- `Docs/breach_mcp_architecture_v2.3.md`
+- `Docs/mission_authoring_contract_v2.3.md`
+- `Docs/mission_pipeline_contract_v2.3.md`
+- `Docs/mission_template_v2.3.md`
+- `Docs/mission_data_contract_v2.3.md`
+- `Docs/generation_manifest_contract_v2.3.md`
 
 `Docs/project_documentation.md`, `Docs/index.md`, `Docs/README.md`, and
-`Docs/workspace_index.md` point at the v2.2 documentation set.
-
-The v2.3 continuation plan exists outside the repo in
-`C:\Users\MY\Downloads\план_продолжения_работы_bse_v_2.md` and should be
-converted into repo-owned docs before code changes depend on it.
+`Docs/workspace_index.md` point at the v2.3 documentation set.
 
 ## Runtime Tools
 
@@ -123,15 +118,19 @@ Gaps against the v2.3 plan:
 - Retry seed derivation currently uses
   `requestedSeed:missionId:retryIndex:pipelineVersion`; the v2.3 plan calls
   for a failure-code-aware policy.
-- v2.3-specific validation codes such as `TPL_UNKNOWN_FIELD`,
-  `TPL_RANGE_INVALID`, `TPL_PROFILE_REF_MISSING`, `TPL_OBJECTIVE_INVALID`, and
-  `TPL_ACTOR_ROSTER_INVALID` are not emitted yet. Most cases are grouped under
-  `TPL_SCHEMA_INVALID` or `TPL_SEMANTIC_INVALID`.
-- Payload validation is an internal shape check, not a repo-owned draft JSON
-  Schema validation step.
 - Verification metrics do not yet cover the full v2.3 target set such as
   alternate routes, hearing overlap percentage, chokepoint pressure, and
   objective room pressure.
+
+Implemented since the audit snapshot:
+
+- v2.3-specific validation codes such as `TPL_UNKNOWN_FIELD`,
+  `TPL_RANGE_INVALID`, `TPL_PROFILE_REF_MISSING`, `TPL_OBJECTIVE_INVALID`, and
+  `TPL_ACTOR_ROSTER_INVALID` are emitted by the template validator.
+- Payload validation now uses a repo-owned JSON Schema file before payload
+  write.
+- Invalid template fixtures now exist under
+  `UserMissionSources/missions/_test_invalid_*`.
 
 ## VS01 Mission State
 

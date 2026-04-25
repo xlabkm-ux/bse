@@ -132,7 +132,7 @@ Handoff note:
 
 Status:
 
-- pending
+- completed
 
 Goal:
 
@@ -144,6 +144,15 @@ Work:
 - add invalid template fixtures
 - document or replace the current custom YAML subset parser
 - add repo-owned JSON Schema validation before payload write
+
+Completed:
+
+- split template validation findings into `TPL_UNKNOWN_FIELD`,
+  `TPL_RANGE_INVALID`, `TPL_PROFILE_REF_MISSING`, `TPL_OBJECTIVE_INVALID`,
+  and `TPL_ACTOR_ROSTER_INVALID`
+- added invalid template fixtures under `UserMissionSources/missions/_test_invalid_*`
+- documented the current line-oriented YAML subset parser in the template contract
+- added repo-owned JSON Schema validation for `mission_payload.generated.json`
 
 ### v2.3 Session 5: Verification and Retry Hardening
 

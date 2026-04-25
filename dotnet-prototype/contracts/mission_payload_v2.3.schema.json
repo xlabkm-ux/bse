@@ -1,32 +1,27 @@
-# Mission Data Contract v2.3
-
-Status: Active documentation contract
-Version: 2.3
-Project: `Breach Scenario Engine`
-Scope: Technical contract between the mission compiler and Unity runtime
-
-This document defines the JSON Schema for `mission_payload.generated.json`.
-The compiler writes this file after successful template validation and before
-layout generation.
-
-The repo-owned machine-readable schema lives at
-`dotnet-prototype/contracts/mission_payload_v2.3.schema.json` and is used as
-the pre-write validation source in the current pipeline.
-
-## 1. JSON Schema
-
-```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Breach Scenario Engine Mission Payload v2.3",
   "type": "object",
   "additionalProperties": false,
-  "required": ["header", "spatial", "logic", "roster", "objectives", "profileRefs"],
+  "required": [
+    "header",
+    "spatial",
+    "logic",
+    "roster",
+    "objectives",
+    "profileRefs"
+  ],
   "properties": {
     "header": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "pipelineVersion", "missionId", "initialSeed", "effectiveSeed"],
+      "required": [
+        "schemaVersion",
+        "pipelineVersion",
+        "missionId",
+        "initialSeed",
+        "effectiveSeed"
+      ],
       "properties": {
         "schemaVersion": { "const": "bse.mission_payload.v2.3" },
         "pipelineVersion": { "const": "2.3" },
@@ -112,7 +107,11 @@ the pre-write validation source in the current pipeline.
             "maxEmptyRooms": { "type": "integer", "minimum": 0 },
             "minCoverPiecesPerRoom": { "type": "integer", "minimum": 0 },
             "minAlternateRoutes": { "type": "integer", "minimum": 0 },
-            "minHearingOverlapPercentage": { "type": "number", "minimum": 0, "maximum": 100 }
+            "minHearingOverlapPercentage": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
           }
         }
       }
@@ -132,7 +131,12 @@ the pre-write validation source in the current pipeline.
           },
           "placementPolicy": {
             "type": "string",
-            "enum": ["EntryPointOnly", "PostLayout_TaggedRoom", "PostLayout_AnyRoom", "SecureRoomOnly"]
+            "enum": [
+              "EntryPointOnly",
+              "PostLayout_TaggedRoom",
+              "PostLayout_AnyRoom",
+              "SecureRoomOnly"
+            ]
           },
           "count": { "type": "integer", "minimum": 0 }
         }
@@ -173,15 +177,6 @@ the pre-write validation source in the current pipeline.
         "tacticalDensityProfile": { "$ref": "#/$defs/repoPath" },
         "addressablesCatalogProfile": { "$ref": "#/$defs/repoPath" }
       }
-    },
-    "catalogRefs": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enemyCatalog": { "$ref": "#/$defs/repoPath" },
-        "environmentCatalog": { "$ref": "#/$defs/repoPath" },
-        "objectiveCatalog": { "$ref": "#/$defs/repoPath" }
-      }
     }
   },
   "$defs": {
@@ -203,66 +198,3 @@ the pre-write validation source in the current pipeline.
     }
   }
 }
-```
-
-## 2. Unity DTO Requirements
-
-When Unity parses this payload:
-
-1. Use strict member handling.
-2. Treat missing members as errors.
-3. Treat unknown payload fields as errors.
-4. Map `policy` to the runtime navigation policy enum.
-5. Treat `effectiveSeed > 0` as authoritative only when the accepted manifest
-   also reports `status == "PASS"`.
-6. Validate theme, profile refs, and catalog refs before Step 6 begins.
-
-## 3. Compiler Mapping
-
-| Template Field | Payload Field |
-|---|---|
-| `schemaVersion` | derives `header.schemaVersion` |
-| `missionId` | `header.missionId` |
-| `missionTitle` | `header.missionTitle` |
-| `generationMeta.initialSeed` | `header.initialSeed` |
-| none | `header.effectiveSeed` |
-| `spatialConstraints.worldBounds` | `spatial.bounds` |
-| `spatialConstraints.tacticalTheme` | `spatial.theme` |
-| `spatialConstraints.pixelsPerUnit` | `spatial.ppu` |
-| `spatialConstraints.bspConstraints.forceRoomAdjacency` | `spatial.bsp.forceAdjacency` |
-| `tacticalRules.noiseAlertThreshold` | `logic.noise.threshold` |
-| `tacticalRules.strictNavigationPolicy` | `logic.navigation.strict` |
-| `actorRoster[].navigationPolicy` | `roster[].policy` |
-
-## 4. Seed Handling
-
-- `initialSeed` is copied from the user template.
-- `effectiveSeed` is `0` until Step 7 returns PASS.
-- Replay must use `effectiveSeed` only when the manifest status is PASS.
-- Final seed ownership lives in `generation_manifest.json`.
-
-## 5. Profile and Catalog Paths
-
-Profile and catalog paths must be repository-relative. v2.3 roots are:
-
-- `Assets/Data/Mission/Profiles/`
-- `Assets/Data/Mission/Catalogs/`
-- `Assets/Data/Mission/MissionConfig/<missionId>/Profiles/`
-- `Assets/Data/Mission/MissionConfig/<missionId>/Catalogs/`
-
-The payload must not contain absolute local machine paths.
-
-## 6. Validation Posture
-
-Before writing payload:
-
-- template validation must PASS
-- payload schema validation must PASS
-- generated payload must be deterministic for the same source template
-- compile report must include warnings and normalized decisions as JSON
-
-Before Step 6:
-
-- profile references must resolve
-- catalog references must resolve when present
-- unsupported profile or catalog versions are blocking

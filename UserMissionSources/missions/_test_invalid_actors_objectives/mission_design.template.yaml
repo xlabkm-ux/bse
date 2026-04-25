@@ -1,0 +1,44 @@
+schemaVersion: "tb.mission_template.v2.3"
+missionId: "VS93_InvalidRosterAndObjectives"
+missionTitle: "Invalid Roster And Objectives"
+
+generationMeta:
+  initialSeed: 17
+  generationTimeout: 45
+  maxRetries: 2
+
+spatialConstraints:
+  worldBounds: [64, 64]
+  pixelsPerUnit: 128
+  tacticalTheme: "urban_cqb"
+  bspConstraints:
+    minRoomSize: [4, 4]
+    maxRoomSize: [12, 12]
+    corridorWidth: 2
+    forceRoomAdjacency: true
+
+tacticalRules:
+  noiseAlertThreshold: 0.15
+  strictNavigationPolicy: true
+  enforcePostLayoutPlacement: true
+  acousticOcclusion:
+    wallMultiplier: 2.5
+    doorPenalty: 1.2
+
+actorRoster:
+  - id: "EN_01"
+    type: "Sentry"
+    countRange: [3, 5]
+    navigationPolicy: "Unknown"
+    placementPolicy: "PostLayout_TaggedRoom"
+  - id: "EN_01"
+    type: "Roamer"
+    countRange: [1, 2]
+    navigationPolicy: "CanOpenDoors"
+    placementPolicy: "PostLayout_AnyRoom"
+
+objectives:
+  primary:
+    - id: "OBJ_MAIN"
+      type: "RescueHostage"
+      requiresLayoutGraph: true

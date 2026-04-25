@@ -1,0 +1,47 @@
+schemaVersion: "tb.mission_template.v2.3"
+missionId: "VS92_InvalidProfileRefs"
+missionTitle: "Invalid Profile Refs"
+
+generationMeta:
+  initialSeed: 17
+  generationTimeout: 45
+  maxRetries: 2
+
+spatialConstraints:
+  worldBounds: [64, 64]
+  pixelsPerUnit: 128
+  tacticalTheme: "urban_cqb"
+  bspConstraints:
+    minRoomSize: [4, 4]
+    maxRoomSize: [12, 12]
+    corridorWidth: 2
+    forceRoomAdjacency: true
+
+tacticalRules:
+  noiseAlertThreshold: 0.15
+  strictNavigationPolicy: true
+  enforcePostLayoutPlacement: true
+  acousticOcclusion:
+    wallMultiplier: 2.5
+    doorPenalty: 1.2
+
+profileRefs:
+  tacticalThemeProfile: "Assets/Data/Mission/Profiles/DoesNotExist.asset"
+  performanceProfile: "Assets/Data/Mission/Profiles/PerformanceProfile.asset"
+  navigationPolicy: "Assets/Data/Mission/Profiles/NavigationPolicy.asset"
+  tacticalDensityProfile: "Assets/Data/Mission/Profiles/TacticalDensityProfile.asset"
+  addressablesCatalogProfile: "Assets/Data/Mission/Profiles/AddressablesCatalogProfile.asset"
+
+actorRoster:
+  - id: "OP_01"
+    type: "Operative"
+    countRange: [2, 4]
+    navigationPolicy: "FullAccess"
+    placementPolicy: "EntryPointOnly"
+
+objectives:
+  primary:
+    - id: "OBJ_MAIN"
+      type: "RescueHostage"
+      requiresLayoutGraph: true
+      targetRoomTag: "security_vault"

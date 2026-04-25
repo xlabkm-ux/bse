@@ -1,0 +1,40 @@
+schemaVersion: "tb.mission_template.v2.3"
+missionId: "VS91_InvalidRange"
+missionTitle: "Invalid Range"
+
+generationMeta:
+  initialSeed: -1
+  generationTimeout: 0
+  maxRetries: -3
+
+spatialConstraints:
+  worldBounds: [64, 64]
+  pixelsPerUnit: 64
+  tacticalTheme: "urban_cqb"
+  bspConstraints:
+    minRoomSize: [12, 12]
+    maxRoomSize: [4, 4]
+    corridorWidth: 0
+    forceRoomAdjacency: true
+
+tacticalRules:
+  noiseAlertThreshold: 2
+  strictNavigationPolicy: true
+  enforcePostLayoutPlacement: true
+  acousticOcclusion:
+    wallMultiplier: 2.5
+    doorPenalty: 1.2
+
+actorRoster:
+  - id: "EN_01"
+    type: "Sentry"
+    countRange: [3, 1]
+    navigationPolicy: "StaticGuard"
+    placementPolicy: "PostLayout_TaggedRoom"
+
+objectives:
+  primary:
+    - id: "OBJ_MAIN"
+      type: "RescueHostage"
+      requiresLayoutGraph: true
+      targetRoomTag: "security_vault"

@@ -49,5 +49,5 @@ The inventory is target-only.
 - Mission writes use the mission-scoped `.generation.lock`, lifecycle transitions are recorded in `mission_state.json`, and stale locks require explicit `cleanup_generation_lock`.
 - Mission pipeline regression coverage now includes direct Unity service tests, bridge route/capability checks, server dispatcher routing for every public mission action, and default artifact path creation.
 - Active project documentation now targets v2.3. Current runtime gaps against
-  that contract include v2.3-specific validation finding codes and expanded
-  payload/schema fidelity.
+  that contract now center on expanded verification metrics and the remaining
+  content-layer alignment work.

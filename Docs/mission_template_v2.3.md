@@ -164,7 +164,22 @@ Pipeline order and replay errors use their own runtime code families, such as:
 - `SEED_EFFECTIVE_WRITTEN_BEFORE_PASS`
 - `GENERATION_LOCK_CONFLICT`
 
-## 8. Complete Example
+## 8. Parser Constraints
+
+The current compiler intentionally uses a narrow, line-oriented YAML subset
+parser instead of a full YAML engine. Supported templates keep to:
+
+- two-space indentation
+- scalar key/value pairs
+- inline integer arrays such as `[64, 64]`
+- nested mappings for the known mission sections
+
+Unsupported YAML features include tabs, anchors, aliases, multiline scalars,
+and arbitrary sequence syntax outside the mission roster/objective patterns.
+Templates that need those features are out of scope for the current v2.3
+pipeline.
+
+## 9. Complete Example
 
 ```yaml
 schemaVersion: "tb.mission_template.v2.3"
@@ -213,13 +228,13 @@ actorRoster:
 
 objectives:
   primary:
-    - id: "OBJ_MAIN"
+  - id: "OBJ_MAIN"
       type: "RescueHostage"
       requiresLayoutGraph: true
       targetRoomTag: "security_vault"
 ```
 
-## 9. Artifact Boundary
+## 10. Artifact Boundary
 
 The template never owns:
 
@@ -231,4 +246,3 @@ The template never owns:
 - `generation_manifest.json`
 - `mission_state.json`
 - `.generation.lock`
-
