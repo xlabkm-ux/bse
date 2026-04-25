@@ -4666,8 +4666,6 @@ namespace BreachScenarioEngine.Mcp.Editor
             return (false, "TestRunnerApi.Execute not found.");
         }
 
-        TryAttachTestRunnerCallbacks(apiType, api, modeStr);
-        execute.Invoke(api, new[] { settings! });
         var status = new JsonObject
         {
             ["jobId"] = jobId,
@@ -4677,6 +4675,26 @@ namespace BreachScenarioEngine.Mcp.Editor
             ["startedAtUtc"] = DateTime.UtcNow.ToString("O")
         };
         WriteTestsStatus(status.ToJsonString());
+        TryAttachTestRunnerCallbacks(apiType, api, modeStr);
+        try
+        {
+            execute.Invoke(api, new[] { settings! });
+        }
+        catch (Exception ex)
+        {
+            var error = new JsonObject
+            {
+                ["jobId"] = jobId,
+                ["state"] = "error",
+                ["mode"] = modeStr,
+                ["filter"] = string.IsNullOrWhiteSpace(testFilter) ? null : testFilter,
+                ["startedAtUtc"] = status["startedAtUtc"]?.DeepClone(),
+                ["finishedAtUtc"] = DateTime.UtcNow.ToString("O"),
+                ["message"] = ex.InnerException?.Message ?? ex.Message
+            };
+            WriteTestsStatus(error.ToJsonString());
+            return (false, $"TestRunnerApi.Execute failed: {ex.InnerException?.Message ?? ex.Message}");
+        }
         return (true, $"Test run started: job_id={jobId}; mode={modeStr}{(string.IsNullOrWhiteSpace(testFilter) ? string.Empty : $"; filter={testFilter}")}");
     }
 

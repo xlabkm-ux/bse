@@ -317,7 +317,8 @@ public sealed class McpRequestDispatcher
             }
             Thread.Sleep(100);
         }
-        return Ok($"queued:{cmd}; id={id}; response=pending");
+        var timeoutMessage = BuildBridgeTimeoutMessage(b, cmd, id, waitMs);
+        return timeoutMessage.IsStale ? Err(timeoutMessage.Message) : Ok(timeoutMessage.Message);
     }
 
     private ToolCallResult ScriptCreate(JsonElement a)
@@ -907,12 +908,125 @@ $"[CreateAssetMenu(menuName = \"Breach Scenario Engine MCP/{Ident(name)}\")]\n" 
         var payload = InjectArg(a, "mode",
             string.Equals(mode, "PlayMode", StringComparison.OrdinalIgnoreCase) ? "PlayMode" :
             string.Equals(mode, "All", StringComparison.OrdinalIgnoreCase) ? "All" : "EditMode");
-        return Bridge("run_tests", payload);
+        var start = Bridge("run_tests", payload);
+        if (start.IsError || (IntOpt(a, "waitMs") ?? 1200) <= 0 || BoolOpt(a, "async") == true)
+        {
+            return start;
+        }
+
+        var startText = start.Content.Count > 0 ? start.Content[0].Text : string.Empty;
+        var jobId = ExtractTestJobId(startText);
+        if (string.IsNullOrWhiteSpace(jobId))
+        {
+            return start;
+        }
+
+        var pollTimeoutMs = IntOpt(a, "pollTimeoutMs") ?? IntOpt(a, "testTimeoutMs") ?? 120000;
+        var pollIntervalMs = Math.Clamp(IntOpt(a, "pollIntervalMs") ?? 1000, 250, 5000);
+        return PollTestJob(a, jobId!, pollTimeoutMs, pollIntervalMs, startText);
     }
 
     private ToolCallResult GetTestJob(JsonElement a)
     {
         return Bridge("get_test_job", a);
+    }
+
+    private ToolCallResult PollTestJob(JsonElement source, string jobId, int timeoutMs, int intervalMs, string startText)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(Math.Max(timeoutMs, 0));
+        ToolCallResult? latest = null;
+        while (DateTime.UtcNow <= deadline)
+        {
+            var pollArgs = InjectArg(InjectArg(source, "jobId", jobId), "waitMs", "5000");
+            latest = Bridge("get_test_job", pollArgs);
+            if (latest.IsError)
+            {
+                return latest;
+            }
+
+            var text = latest.Content.Count > 0 ? latest.Content[0].Text : string.Empty;
+            var state = ExtractJsonString(text, "state");
+            if (IsTerminalTestState(state))
+            {
+                return latest;
+            }
+
+            Thread.Sleep(intervalMs);
+        }
+
+        if (latest != null && latest.Content.Count > 0)
+        {
+            return Ok($"Test job poll timed out after {timeoutMs}ms; start={startText}; latest={latest.Content[0].Text}");
+        }
+
+        return Ok($"Test job poll timed out after {timeoutMs}ms; start={startText}");
+    }
+
+    private static bool IsTerminalTestState(string? state)
+    {
+        return string.Equals(state, "completed", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(state, "failed", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(state, "error", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(state, "timeout", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(state, "blocked", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static (bool IsStale, string Message) BuildBridgeTimeoutMessage(string bridgeRoot, string command, string commandId, int waitMs)
+    {
+        var heartbeatPath = Path.Combine(bridgeRoot, "heartbeat.json");
+        if (!File.Exists(heartbeatPath))
+        {
+            return (true, $"Bridge response timed out after {waitMs}ms for {command}; id={commandId}; heartbeat=missing; open Unity with this project or use waitMs=0 to queue asynchronously.");
+        }
+
+        try
+        {
+            var heartbeatRaw = File.ReadAllText(heartbeatPath);
+            var heartbeatAt = ExtractJsonString(heartbeatRaw, "at");
+            if (DateTime.TryParse(heartbeatAt, out var parsed))
+            {
+                var heartbeatUtc = parsed.Kind == DateTimeKind.Utc ? parsed : parsed.ToUniversalTime();
+                var age = DateTime.UtcNow - heartbeatUtc;
+                if (age > TimeSpan.FromSeconds(30))
+                {
+                    return (true, $"Bridge response timed out after {waitMs}ms for {command}; id={commandId}; heartbeat=stale; heartbeatAgeSeconds={(int)age.TotalSeconds}; reopen Unity with this project or use waitMs=0 to queue asynchronously.");
+                }
+            }
+        }
+        catch
+        {
+            return (true, $"Bridge response timed out after {waitMs}ms for {command}; id={commandId}; heartbeat=unreadable; reopen Unity with this project or use waitMs=0 to queue asynchronously.");
+        }
+
+        return (false, $"queued:{command}; id={commandId}; response=pending");
+    }
+
+    private static string? ExtractTestJobId(string text)
+    {
+        var match = Regex.Match(text, @"job[_-]id\s*=\s*(?<job>[A-Za-z0-9_-]+)", RegexOptions.IgnoreCase);
+        return match.Success ? match.Groups["job"].Value : null;
+    }
+
+    private static string? ExtractJsonString(string text, string key)
+    {
+        try
+        {
+            var start = text.IndexOf('{');
+            if (start > 0)
+            {
+                text = text[start..];
+            }
+
+            using var doc = JsonDocument.Parse(text);
+            return doc.RootElement.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String
+                ? value.GetString()
+                : null;
+        }
+        catch
+        {
+            var match = Regex.Match(text, $"\"{Regex.Escape(key)}\"\\s*:\\s*\"(?<value>[^\"]+)\"", RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups["value"].Value : null;
+        }
     }
 
     private string? ResolveRoot(JsonElement a) => Req(a, "projectRoot") ?? _defaultProjectRoot;
