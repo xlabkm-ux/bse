@@ -207,6 +207,8 @@ Completed:
 - captured Addressables labels on the mission profile asset
 - made `compile_payload` and `verify` emit and validate `catalogRefs` against the
   repo-owned catalog assets
+- added a dedicated Unity editmode bootstrap runner and captured an XML test
+  report from the editor test suite
 
 Exit criteria:
 

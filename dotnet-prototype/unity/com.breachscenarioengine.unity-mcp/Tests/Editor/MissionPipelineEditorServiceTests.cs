@@ -296,7 +296,7 @@ namespace BreachScenarioEngine.Mcp.Editor.Tests
                 Assert.False(string.IsNullOrWhiteSpace(entity.GetProperty("navNodeId").GetString()));
                 Assert.AreEqual(layoutRevisionId, entity.GetProperty("layoutRevisionId").GetString());
                 var ownership = entity.GetProperty("ownership");
-                Assert.AreEqual("manage_mission", ownership.GetProperty("owner").GetString());
+                Assert.AreEqual("bse-pipeline", ownership.GetProperty("owner").GetString());
                 Assert.AreEqual("manage_mission.place_entities", ownership.GetProperty("generatedBy").GetString());
                 Assert.AreEqual(layoutRevisionId, ownership.GetProperty("layoutRevisionId").GetString());
                 Assert.False(string.IsNullOrWhiteSpace(ownership.GetProperty("stableKey").GetString()));
