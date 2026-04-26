@@ -1,4 +1,4 @@
-name: Pilot Mission CI
+name: Pilot Mission CI Preview
 
 on:
   pull_request:
@@ -6,17 +6,20 @@ on:
     branches: [ main ]
 
 jobs:
-  unity-pilot:
+  unity-pilot-preview:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run Unity EditMode pilot mission pipeline
+      - name: Report Unity pilot command
         run: |
-          echo "Run Unity batchmode pipeline with:"
+          echo "This workflow is a CI preview placeholder."
+          echo "It does not run Unity on GitHub Actions until a licensed Unity runner is configured."
+          echo "Local validation command:"
           echo "Unity -batchmode -projectPath . -executeMethod BreachScenarioEngine.Editor.CI.PilotMissionPipelineCi.RunAll -quit"
-      - name: Upload pilot report artifacts
+      - name: Upload local pilot report artifacts when present
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: pilot-mission-reports
           path: Artifacts/PilotReports
+          if-no-files-found: warn
