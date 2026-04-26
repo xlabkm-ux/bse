@@ -226,6 +226,19 @@ Materialization resolves content through:
 `Resources.Load<T>()` is not the normal contract. It may exist only as a
 temporary compatibility path with a documented removal plan.
 
+Current preview materialization uses a dedicated content resolver boundary:
+
+- catalog assets must be present and schema-valid before preview generation
+- the resolver is the only place that may provide temporary debug tiles or
+  marker sprites
+- debug fallback is explicit in the materialization metrics through
+  `previewContentMode: "debug_fallback"` and `debugFallbackCount`
+- fallback visuals are output-only preview aids; generated JSON artifacts stay
+  the source of truth for mission acceptance, replay, placement, and
+  verification
+- future real tile/prefab lookup should plug into the resolver instead of
+  adding direct lookup calls inside the materializer
+
 ## 13. Platform Constraints
 
 Materialized scenes must preserve the product platform targets:
@@ -258,6 +271,8 @@ Materialization should return a JSON-compatible result:
   ],
   "findings": [],
   "metrics": {
+    "previewContentMode": "debug_fallback",
+    "debugFallbackCount": 11,
     "materializedDoorCount": 4,
     "materializedCoverCount": 12,
     "materializedActorCount": 6

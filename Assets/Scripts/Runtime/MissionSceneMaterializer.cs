@@ -16,6 +16,8 @@ namespace BreachScenarioEngine.Runtime
     [Serializable]
     public sealed class MissionSceneMaterializationMetrics
     {
+        public string previewContentMode = "";
+        public int debugFallbackCount;
         public int roomCount;
         public int portalCount;
         public int catalogCount;
@@ -45,8 +47,6 @@ namespace BreachScenarioEngine.Runtime
     public static class MissionSceneMaterializer
     {
         private const string GeneratedOwner = "bse-pipeline";
-        private static readonly Dictionary<string, TileBase> TileCache = new(StringComparer.Ordinal);
-        private static Sprite sharedSprite;
 
         public static MissionSceneMaterializationReport Materialize(
             MissionSceneContext context,
@@ -124,7 +124,10 @@ namespace BreachScenarioEngine.Runtime
             EnsureStructure(context, config, layout, manifest);
             var clearedGeneratedObjectCount = ClearGeneratedContent(context);
             var rooms = BuildRoomLookup(layout.RoomGraph.rooms);
+            var content = MissionPreviewContentResolver.Resolve(config);
 
+            report.metrics.previewContentMode = content.Mode;
+            report.metrics.debugFallbackCount = content.DebugFallbackCount;
             report.metrics.roomCount = layout.RoomGraph.rooms != null ? layout.RoomGraph.rooms.Length : 0;
             report.metrics.portalCount = layout.PortalGraph.portals != null ? layout.PortalGraph.portals.Length : 0;
             report.metrics.coverCount = layout.CoverGraph.coverPoints != null ? layout.CoverGraph.coverPoints.Length : 0;
@@ -133,11 +136,11 @@ namespace BreachScenarioEngine.Runtime
             report.metrics.catalogCount = CountCatalogRefs(config);
             report.metrics.clearedGeneratedObjectCount = clearedGeneratedObjectCount;
 
-            MaterializeRooms(layout, context, findings, ref report.metrics.tileCount);
-            MaterializePortals(layout, context, rooms, findings, ref report.metrics.doorCount, ref report.metrics.windowCount, ref report.metrics.extractionZoneCount);
-            MaterializeCovers(layout, context, rooms, findings);
-            MaterializeActors(entities, context, rooms, findings);
-            MaterializeObjectives(entities, context, rooms, findings);
+            MaterializeRooms(layout, context, content, findings, ref report.metrics.tileCount);
+            MaterializePortals(layout, context, content, rooms, findings, ref report.metrics.doorCount, ref report.metrics.windowCount, ref report.metrics.extractionZoneCount);
+            MaterializeCovers(layout, context, content, rooms, findings);
+            MaterializeActors(entities, context, content, rooms, findings);
+            MaterializeObjectives(entities, context, content, rooms, findings);
 
             report.status = findings.Count == 0 ? "PASS" : "FAIL";
             report.message = findings.Count == 0 ? "Scene materialized successfully." : findings[0].message;
@@ -197,7 +200,7 @@ namespace BreachScenarioEngine.Runtime
             return cleared;
         }
 
-        private static void MaterializeRooms(MissionLayout layout, MissionSceneContext context, List<MissionSceneMaterializationFinding> findings, ref int tileCount)
+        private static void MaterializeRooms(MissionLayout layout, MissionSceneContext context, MissionPreviewContentSet content, List<MissionSceneMaterializationFinding> findings, ref int tileCount)
         {
             if (layout.RoomGraph.rooms == null)
             {
@@ -216,8 +219,8 @@ namespace BreachScenarioEngine.Runtime
                 var y = Mathf.RoundToInt(room.rect.y);
                 var width = Mathf.Max(1, Mathf.RoundToInt(room.rect.width));
                 var height = Mathf.Max(1, Mathf.RoundToInt(room.rect.height));
-                var floorTile = TileFor("floor", new Color(0.18f, 0.22f, 0.24f, 0.72f));
-                var wallTile = TileFor("wall", new Color(0.78f, 0.82f, 0.84f, 1f));
+                var floorTile = content.FloorTile;
+                var wallTile = content.WallTile;
 
                 for (var tx = x; tx < x + width; tx++)
                 {
@@ -247,6 +250,7 @@ namespace BreachScenarioEngine.Runtime
         private static void MaterializePortals(
             MissionLayout layout,
             MissionSceneContext context,
+            MissionPreviewContentSet content,
             IReadOnlyDictionary<string, MissionRoom> rooms,
             List<MissionSceneMaterializationFinding> findings,
             ref int doorCount,
@@ -264,8 +268,8 @@ namespace BreachScenarioEngine.Runtime
 
                     var parent = IsWindowPortal(portal) ? context.WindowsRoot : context.DoorsRoot;
                     var color = IsWindowPortal(portal)
-                        ? new Color(0.7f, 0.85f, 0.98f, 1f)
-                        : new Color(0.9f, 0.72f, 0.22f, 1f);
+                        ? content.WindowColor
+                        : content.DoorColor;
                     var position = new Vector3(portal.x, portal.y, 0f);
                     var width = Mathf.Max(0.5f, portal.width);
                     var size = IsHorizontal(portal.orientation) ? new Vector3(width, 0.35f, 1f) : new Vector3(0.35f, width, 1f);
@@ -275,7 +279,7 @@ namespace BreachScenarioEngine.Runtime
                         ClearCollisionSegment(context.CollisionMap, portal.x, portal.y, portal.width, portal.orientation);
                     }
 
-                    CreateMarker(parent, layout.missionId, portal.id, position, size, color, portal.kind, portal.id, portal.id, portal.layoutRevisionId, false);
+                    CreateMarker(parent, content, layout.missionId, portal.id, position, size, color, portal.kind, portal.id, portal.id, portal.layoutRevisionId, false);
 
                     if (IsWindowPortal(portal))
                     {
@@ -303,19 +307,19 @@ namespace BreachScenarioEngine.Runtime
                 var position = new Vector3(breachPoint.x, breachPoint.y, 0f);
                 var size = new Vector3(Mathf.Max(0.5f, breachPoint.width), 0.35f, 1f);
                 ClearCollisionSegment(context.CollisionMap, breachPoint.x, breachPoint.y, breachPoint.width, breachPoint.side);
-                CreateMarker(context.DoorsRoot, layout.missionId, breachPoint.id, position, size, new Color(0.95f, 0.42f, 0.24f, 1f), breachPoint.kind, breachPoint.id, breachPoint.id, breachPoint.layoutRevisionId, false);
+                CreateMarker(context.DoorsRoot, content, layout.missionId, breachPoint.id, position, size, content.BreachColor, breachPoint.kind, breachPoint.id, breachPoint.id, breachPoint.layoutRevisionId, false);
                 doorCount++;
             }
 
             if (!string.IsNullOrEmpty(layout.LayoutGraph.entryRoomId) && rooms.TryGetValue(layout.LayoutGraph.entryRoomId, out var entryRoom))
             {
                 var extractionPosition = RoomCenter(entryRoom);
-                CreateMarker(context.ExtractionRoot, layout.missionId, "ExtractionZone", extractionPosition, new Vector3(1.25f, 1.25f, 1f), new Color(0.42f, 0.9f, 0.45f, 0.4f), "extraction", "ExtractionZone", "ExtractionZone", layout.layoutRevisionId, true);
+                CreateMarker(context.ExtractionRoot, content, layout.missionId, "ExtractionZone", extractionPosition, new Vector3(1.25f, 1.25f, 1f), content.ExtractionColor, "extraction", "ExtractionZone", "ExtractionZone", layout.layoutRevisionId, true);
                 extractionZoneCount++;
             }
         }
 
-        private static void MaterializeCovers(MissionLayout layout, MissionSceneContext context, IReadOnlyDictionary<string, MissionRoom> rooms, List<MissionSceneMaterializationFinding> findings)
+        private static void MaterializeCovers(MissionLayout layout, MissionSceneContext context, MissionPreviewContentSet content, IReadOnlyDictionary<string, MissionRoom> rooms, List<MissionSceneMaterializationFinding> findings)
         {
             if (layout.CoverGraph.coverPoints == null)
             {
@@ -330,11 +334,11 @@ namespace BreachScenarioEngine.Runtime
                 }
 
                 var roomPosition = new Vector3(cover.x, cover.y, 0f);
-                CreateMarker(context.CoversRoot, layout.missionId, cover.id, roomPosition, new Vector3(0.45f, 0.45f, 1f), new Color(0.28f, 0.55f, 0.42f, 1f), cover.quality, cover.id, cover.id, cover.layoutRevisionId, false);
+                CreateMarker(context.CoversRoot, content, layout.missionId, cover.id, roomPosition, new Vector3(0.45f, 0.45f, 1f), content.CoverColor, cover.quality, cover.id, cover.id, cover.layoutRevisionId, false);
             }
         }
 
-        private static void MaterializeActors(MissionEntities entities, MissionSceneContext context, IReadOnlyDictionary<string, MissionRoom> rooms, List<MissionSceneMaterializationFinding> findings)
+        private static void MaterializeActors(MissionEntities entities, MissionSceneContext context, MissionPreviewContentSet content, IReadOnlyDictionary<string, MissionRoom> rooms, List<MissionSceneMaterializationFinding> findings)
         {
             if (entities.actors == null)
             {
@@ -352,12 +356,12 @@ namespace BreachScenarioEngine.Runtime
                 slotIndex++;
                 var parent = ResolveActorParent(context, actor.type);
                 var position = ResolveRoomAnchor(rooms, actor.roomId, actor.entityId, slotIndex);
-                var color = ResolveActorColor(actor.type);
-                CreateMarker(parent, entities.missionId, actor.entityId, position, new Vector3(0.5f, 0.5f, 1f), color, actor.type, actor.entityId, actor.sourceActorId, actor.layoutRevisionId, false, actor.ownership);
+                var color = ResolveActorColor(content, actor.type);
+                CreateMarker(parent, content, entities.missionId, actor.entityId, position, new Vector3(0.5f, 0.5f, 1f), color, actor.type, actor.entityId, actor.sourceActorId, actor.layoutRevisionId, false, actor.ownership);
             }
         }
 
-        private static void MaterializeObjectives(MissionEntities entities, MissionSceneContext context, IReadOnlyDictionary<string, MissionRoom> rooms, List<MissionSceneMaterializationFinding> findings)
+        private static void MaterializeObjectives(MissionEntities entities, MissionSceneContext context, MissionPreviewContentSet content, IReadOnlyDictionary<string, MissionRoom> rooms, List<MissionSceneMaterializationFinding> findings)
         {
             if (entities.objectives == null)
             {
@@ -372,7 +376,7 @@ namespace BreachScenarioEngine.Runtime
                 }
 
                 var position = ResolveRoomAnchor(rooms, objective.roomId, objective.entityId, objective.optional ? 2 : 1);
-                var marker = CreateMarker(context.ObjectivesRoot, entities.missionId, objective.entityId, position, new Vector3(0.62f, 0.62f, 1f), new Color(0.56f, 0.36f, 0.86f, 1f), objective.type, objective.entityId, objective.entityId, objective.layoutRevisionId, true, objective.ownership);
+                var marker = CreateMarker(context.ObjectivesRoot, content, entities.missionId, objective.entityId, position, new Vector3(0.62f, 0.62f, 1f), content.ObjectiveColor, objective.type, objective.entityId, objective.entityId, objective.layoutRevisionId, true, objective.ownership);
                 if (marker != null)
                 {
                     var trigger = marker.AddComponent<MissionCompleteTrigger>();
@@ -641,19 +645,19 @@ namespace BreachScenarioEngine.Runtime
             return context.EnemiesRoot;
         }
 
-        private static Color ResolveActorColor(string actorType)
+        private static Color ResolveActorColor(MissionPreviewContentSet content, string actorType)
         {
             if (string.Equals(actorType, "Operative", StringComparison.OrdinalIgnoreCase))
             {
-                return new Color(0.24f, 0.62f, 0.9f, 1f);
+                return content.OperativeColor;
             }
 
             if (string.Equals(actorType, "Hostage", StringComparison.OrdinalIgnoreCase))
             {
-                return new Color(0.92f, 0.82f, 0.34f, 1f);
+                return content.HostageColor;
             }
 
-            return new Color(0.84f, 0.25f, 0.22f, 1f);
+            return content.EnemyColor;
         }
 
         private static Dictionary<string, MissionRoom> BuildRoomLookup(MissionRoom[] rooms)
@@ -981,40 +985,7 @@ namespace BreachScenarioEngine.Runtime
             return existing;
         }
 
-        private static TileBase TileFor(string key, Color color)
-        {
-            if (TileCache.TryGetValue(key, out var cached))
-            {
-                return cached;
-            }
-
-            var tile = ScriptableObject.CreateInstance<Tile>();
-            tile.sprite = SharedSprite();
-            tile.color = color;
-            tile.name = key + "_tile";
-            tile.hideFlags = HideFlags.HideAndDontSave;
-            TileCache[key] = tile;
-            return tile;
-        }
-
-        private static Sprite SharedSprite()
-        {
-            if (sharedSprite != null)
-            {
-                return sharedSprite;
-            }
-
-            var texture = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-            texture.SetPixel(0, 0, Color.white);
-            texture.Apply();
-            texture.hideFlags = HideFlags.HideAndDontSave;
-            sharedSprite = Sprite.Create(texture, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), 1f);
-            sharedSprite.name = "BSE_Materializer_Sprite";
-            sharedSprite.hideFlags = HideFlags.HideAndDontSave;
-            return sharedSprite;
-        }
-
-        private static GameObject CreateMarker(Transform parent, string missionId, string name, Vector3 position, Vector3 size, Color color, string label, string entityId, string sourceId, string layoutRevisionId, bool trigger, MissionOwnership ownership = null)
+        private static GameObject CreateMarker(Transform parent, MissionPreviewContentSet content, string missionId, string name, Vector3 position, Vector3 size, Color color, string label, string entityId, string sourceId, string layoutRevisionId, bool trigger, MissionOwnership ownership = null)
         {
             if (parent == null)
             {
@@ -1027,7 +998,7 @@ namespace BreachScenarioEngine.Runtime
             marker.transform.localScale = size;
 
             var renderer = marker.AddComponent<SpriteRenderer>();
-            renderer.sprite = SharedSprite();
+            renderer.sprite = content.MarkerSprite;
             renderer.color = color;
             renderer.sortingOrder = 3;
 

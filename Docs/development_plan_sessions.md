@@ -1091,7 +1091,7 @@ Handoff note:
 
 Status:
 
-- planned
+- completed
 
 Goal:
 
@@ -1104,6 +1104,30 @@ Work:
 - document that preview visuals are output-only and not the source of truth
 - avoid introducing `Resources.Load` as the normal content path
 
+Completed:
+
+- added `MissionPreviewContentResolver` as the preview content-resolution
+  boundary for temporary tiles and marker sprites
+- moved debug fallback tile/sprite creation out of `MissionSceneMaterializer`
+- kept catalog validation mandatory before preview generation while making the
+  actual debug fallback explicit in materialization metrics
+- added `previewContentMode` and `debugFallbackCount` to the materialization
+  report metrics
+- documented that fallback visuals are output-only preview aids and that real
+  tile/prefab lookup should plug into the resolver rather than direct
+  materializer lookup
+- added a materializer regression assertion for explicit debug fallback
+  reporting
+
+Verification:
+
+- confirmed the materializer and resolver do not introduce `Resources.Load`,
+  `AssetDatabase`, or `GameObject.Find`
+- Unity batchmode EditMode test execution was attempted, but Unity returned:
+  `It looks like another Unity instance is running with this project open.`
+- live MCP `run_tests` was queued while the open editor owned the project, but
+  no immediate XML test report was available in this chat
+
 Exit criteria:
 
 - preview uses a clear content-resolution seam
@@ -1114,6 +1138,15 @@ Recommended handoff note:
 
 - "Please add a content resolution seam so the preview layer can move toward
   real assets without hiding debug fallback behavior."
+
+Handoff note:
+
+- "Catalog-driven preview visuals now go through
+  `MissionPreviewContentResolver`, with explicit debug fallback metrics and no
+  `Resources.Load` path. Batchmode tests are blocked by another Unity instance
+  holding the project; rerun `MissionSceneMaterializerTests` from the live
+  editor or after closing the existing Unity instance before the CI honesty
+  slice."
 
 ### Session 6: CI Honesty And Validation
 

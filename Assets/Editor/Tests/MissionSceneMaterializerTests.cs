@@ -18,6 +18,8 @@ namespace BreachScenarioEngine.Editor.Tests
                 var report = MissionSceneMaterializer.Materialize(bundle.Context, bundle.Config, bundle.Manifest, bundle.Layout, bundle.Entities);
 
                 Assert.AreEqual("PASS", report.status, report.message);
+                Assert.AreEqual("debug_fallback", report.metrics.previewContentMode);
+                Assert.Greater(report.metrics.debugFallbackCount, 0);
                 Assert.NotNull(bundle.Context.Grid, "Grid");
                 Assert.NotNull(bundle.Context.BaseMap, "BaseMap");
                 Assert.NotNull(bundle.Context.CollisionMap, "CollisionMap");
