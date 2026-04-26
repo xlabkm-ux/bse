@@ -1,13 +1,10 @@
 {
-  "name": "BreachScenarioEngine.Mcp.Editor",
-  "rootNamespace": "BreachScenarioEngine.Mcp.Editor",
+  "name": "BreachScenarioEngine.Generation.Layout",
+  "rootNamespace": "BreachScenarioEngine.Generation.Layout",
   "references": [
-    "BreachScenarioEngine.Generation.Layout",
     "BreachScenarioEngine.Generation.TacticalGraphs"
   ],
-  "includePlatforms": [
-    "Editor"
-  ],
+  "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
   "overrideReferences": true,
@@ -21,5 +18,5 @@
   "autoReferenced": true,
   "defineConstraints": [],
   "versionDefines": [],
-  "noEngineReferences": false
+  "noEngineReferences": true
 }

@@ -6,9 +6,9 @@ using BreachScenarioEngine.Generation.TacticalGraphs;
 
 #nullable enable
 
-namespace BreachScenarioEngine.Mcp.Editor
+namespace BreachScenarioEngine.Generation.Layout
 {
-    internal static class BspLayoutGenerator
+    public static class BspLayoutGenerator
     {
         public const string GeneratorId = "pure_bsp_layout_v1";
 
@@ -57,16 +57,16 @@ namespace BreachScenarioEngine.Mcp.Editor
             var portals = BuildPortals(roomModels, options.LayoutRevisionId, Math.Max(1, options.CorridorWidth), options.ForceAdjacency);
             var windows = BuildWindows(roomModels, options.LayoutRevisionId, boundsWidth, boundsHeight);
             var breachPoints = BuildBreachPoints(roomModels, options.LayoutRevisionId);
-            var coverGraph = MissionPipelineEditorService.BuildCoverGraph(
+            var coverGraph = TacticalGraphBuilder.BuildCoverGraph(
                 options.LayoutRevisionId,
                 roomModels.Select(room => room.ToJson()).ToList(),
                 portals.Select(portal => (JsonObject)portal.ToJson().DeepClone()).ToList(),
                 breachPoints.Select(breachPoint => (JsonObject)breachPoint.DeepClone()).ToList(),
                 Math.Max(roomModels.Count, options.CoverBudget));
-            var visibilityGraph = MissionPipelineEditorService.BuildVisibilityGraph(
+            var visibilityGraph = TacticalGraphBuilder.BuildVisibilityGraph(
                 options.LayoutRevisionId,
                 portals.Select(portal => (JsonObject)portal.ToJson().DeepClone()).ToList());
-            var hearingGraph = MissionPipelineEditorService.BuildHearingGraph(
+            var hearingGraph = TacticalGraphBuilder.BuildHearingGraph(
                 options.LayoutRevisionId,
                 portals.Select(portal => (JsonObject)portal.ToJson().DeepClone()).ToList(),
                 options.WallMultiplier,
@@ -557,4 +557,5 @@ namespace BreachScenarioEngine.Mcp.Editor
             }
         }
     }
+
 }

@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using BreachScenarioEngine.Generation.Layout;
 using BreachScenarioEngine.Generation.TacticalGraphs;
 using UnityEditor;
 using UnityEngine;

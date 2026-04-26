@@ -1031,7 +1031,7 @@ Recommended handoff note:
 
 Status:
 
-- planned
+- completed
 
 Goal:
 
@@ -1047,6 +1047,29 @@ Work:
 - preserve deterministic layout output and `layoutRevisionId` behavior unless
   a deliberate bump is required
 
+Completed:
+
+- moved `BspLayoutGenerator` into the repo-owned runtime namespace
+  `BreachScenarioEngine.Generation.Layout`
+- added `Assets/Scripts/Generation/Layout/BreachScenarioEngine.Generation.Layout.asmdef`
+  with a runtime dependency on `BreachScenarioEngine.Generation.TacticalGraphs`
+- updated the embedded editor package and source-copy package to consume the
+  runtime layout generator through asmdef references
+- removed the editor-package-owned BSP implementation copy
+- kept the generator id as `pure_bsp_layout_v1` so existing
+  `layoutRevisionId` behavior remains intentionally stable
+
+Verification:
+
+- confirmed the runtime BSP source has no `UnityEditor`, `UnityEngine`,
+  `Tilemap`, `PrefabUtility`, `GameObject.Find`, `Resources`,
+  `AssetDatabase`, `NavMesh`, or `MissionPipelineEditorService` references
+- Unity batchmode script compilation completed with `ExitCode: 0` and
+  `Tundra build success`
+- targeted EditMode test execution was attempted, but Unity did not emit a
+  test XML report before quitting; verification is compile-level for this
+  session
+
 Exit criteria:
 
 - the layout algorithm no longer lives only inside the editor package
@@ -1056,6 +1079,13 @@ Recommended handoff note:
 
 - "Please move the pure layout generator across the runtime boundary. Keep the
   existing deterministic layout contract intact."
+
+Handoff note:
+
+- "Pure BSP layout generation now lives under
+  `Assets/Scripts/Generation/Layout/`, with the editor package consuming the
+  runtime assembly. Compile is clean; rerun EditMode tests in a live Unity test
+  pass if XML reporting is required before the next slice."
 
 ### Session 5: Catalog-Driven Visuals
 
