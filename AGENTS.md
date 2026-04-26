@@ -13,6 +13,12 @@ Unity находится здесь:
 `Active Continuation` и продолжай следующую незавершенную Session именно из
 активного трека, если пользователь не указал другую задачу.
 
+Если задача относится к подготовке локального pilot testing readiness или к
+`Pilot Testing Preparation for Breach Scenario Engine`, сначала смотри
+`Docs/pilot_testing_preparation_plan.md` и его раздел
+`Summary Execution Plan by Codex Sessions`, затем продолжай следующую
+незавершенную Session именно из этого плана.
+
 Текущий активный трек:
 `BREACH Technology Transfer`.
 

@@ -17,6 +17,9 @@ Short entry point for the active Breach Scenario Engine MCP documentation.
 | [breach_technology_transfer_traceability_v2.3.md](breach_technology_transfer_traceability_v2.3.md) | Source-to-target audit for BREACH technology transfer |
 | [scene_materialization_contract_v2.3.md](scene_materialization_contract_v2.3.md) | Contract for building Unity scene previews from generated artifacts |
 | [breach_technology_transfer_acceptance_v2.3.md](breach_technology_transfer_acceptance_v2.3.md) | Acceptance gates and risk checklist for migrated BREACH technology |
+| [pilot_testing_preparation_plan.md](pilot_testing_preparation_plan.md) | Repository-local summary execution plan for pilot readiness |
+| [pilot_runbook.md](pilot_runbook.md) | Operator guide for local pilot validation |
+| [pilot_result_report_template.md](pilot_result_report_template.md) | Template for recording pilot outcomes and follow-up |
 | [pilot_operation_checklist.md](pilot_operation_checklist.md) | Pilot operation acceptance checklist for VS01, VS02, and VS03 |
 | [ci_honesty_validation_session6.md](ci_honesty_validation_session6.md) | CI preview decision and local validation record for Post-Transfer Session 6 |
 | [development_plan_sessions.md](development_plan_sessions.md) | Session-split plan for handing the work across chats |
@@ -34,4 +37,5 @@ Short entry point for the active Breach Scenario Engine MCP documentation.
 6. Read [mission_pipeline_contract_v2.3.md](mission_pipeline_contract_v2.3.md) before implementing generation code.
 7. Read [mission_data_contract_v2.3.md](mission_data_contract_v2.3.md) and [generation_manifest_contract_v2.3.md](generation_manifest_contract_v2.3.md) for runtime artifacts.
 8. For BREACH technology migration, read [migration_from_breach_scene_builders.md](migration_from_breach_scene_builders.md), [breach_technology_transfer_plan_v2.3.md](breach_technology_transfer_plan_v2.3.md), [breach_technology_transfer_traceability_v2.3.md](breach_technology_transfer_traceability_v2.3.md), [scene_materialization_contract_v2.3.md](scene_materialization_contract_v2.3.md), and [breach_technology_transfer_acceptance_v2.3.md](breach_technology_transfer_acceptance_v2.3.md).
-9. Track remaining work in [development_plan_sessions.md](development_plan_sessions.md).
+9. For pilot readiness, read [pilot_testing_preparation_plan.md](pilot_testing_preparation_plan.md), [pilot_runbook.md](pilot_runbook.md), and [pilot_result_report_template.md](pilot_result_report_template.md).
+10. Track remaining work in [development_plan_sessions.md](development_plan_sessions.md).

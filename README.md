@@ -42,6 +42,10 @@ Initial project scaffold for **TACTICAL BREACH: Mission Architect / Breach Scena
 - [Docs/migration_from_breach_scene_builders.md](Docs/migration_from_breach_scene_builders.md)
 - [Docs/scene_materialization_contract_v2.3.md](Docs/scene_materialization_contract_v2.3.md)
 - [Docs/breach_technology_transfer_acceptance_v2.3.md](Docs/breach_technology_transfer_acceptance_v2.3.md)
+- [Docs/pilot_testing_preparation_plan.md](Docs/pilot_testing_preparation_plan.md)
+- [Docs/pilot_runbook.md](Docs/pilot_runbook.md)
+- [Docs/pilot_result_report_template.md](Docs/pilot_result_report_template.md)
+- [Docs/pilot_operation_checklist.md](Docs/pilot_operation_checklist.md)
 
 ## Standards
 
@@ -55,3 +59,4 @@ Initial project scaffold for **TACTICAL BREACH: Mission Architect / Breach Scena
 - Keep mission pipeline contracts and runtime behavior in sync.
 - Implement v2.3 generation locks and lifecycle state from the session plan.
 - Use `Docs/canonical_tools.md` as the current project MCP tool contract.
+- Use `Scripts/run_pilot_validation.ps1` for the local pilot readiness sweep.

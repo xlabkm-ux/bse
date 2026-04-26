@@ -81,3 +81,10 @@ After CI/batchmode run:
 - Do not run placement before layout generation.
 - Do not write a manifest unless verification is PASS.
 - Treat JSON tool results and generated JSON files as the machine-readable source of truth.
+
+## Operator References
+
+- [Docs/pilot_testing_preparation_plan.md](pilot_testing_preparation_plan.md)
+- [Docs/pilot_runbook.md](pilot_runbook.md)
+- [Docs/pilot_result_report_template.md](pilot_result_report_template.md)
+- `Scripts/run_pilot_validation.ps1`

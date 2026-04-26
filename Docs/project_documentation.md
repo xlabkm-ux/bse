@@ -81,6 +81,20 @@ MCP backlog and generic bridge workflow notes are not part of the active docs.
 - [Docs/breach_technology_transfer_acceptance_v2.3.md](breach_technology_transfer_acceptance_v2.3.md)
   - Acceptance gates, traceability requirements, and migration risks
 
+### Pilot readiness
+
+- [Docs/pilot_testing_preparation_plan.md](pilot_testing_preparation_plan.md)
+  - Repository-local summary execution plan for the pilot readiness sessions
+
+- [Docs/pilot_runbook.md](pilot_runbook.md)
+  - Operator guide for the local pilot validation sequence
+
+- [Docs/pilot_result_report_template.md](pilot_result_report_template.md)
+  - Template for recording pilot outcomes, risks, and go/no-go decisions
+
+- [Docs/pilot_operation_checklist.md](pilot_operation_checklist.md)
+  - Active checklist for the VS01, VS02, and VS03 pilot missions
+
 - [Docs/ci_honesty_validation_session6.md](ci_honesty_validation_session6.md)
   - CI preview decision and local validation record for Post-Transfer Session 6
 
