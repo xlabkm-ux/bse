@@ -79,7 +79,7 @@ namespace BreachScenarioEngine.Editor.CI
                 "# VS01 Verification Log",
                 "",
                 "Mission: `VS01_HostageApartment`",
-                "Pipeline: `v2.2`",
+                "Pipeline: `v2.3`",
                 "Generated: `" + DateTime.UtcNow.ToString("O") + "`",
                 ""
             };

@@ -1152,7 +1152,7 @@ Handoff note:
 
 Status:
 
-- planned
+- completed
 
 Goal:
 
@@ -1167,6 +1167,32 @@ Work:
   mission execution
 - inspect generated reports and note any remaining risks
 
+Completed:
+
+- renamed the GitHub Actions workflow to `Pilot Mission CI Preview`
+- changed the GitHub Actions job and step text so it explicitly reports that
+  GitHub-hosted Unity execution is not active until a licensed runner is
+  configured
+- kept local `Artifacts/` outputs ignored so validation logs and copied reports
+  do not become source-controlled mission state
+- corrected the legacy VS01 CI markdown report label from `v2.2` to `v2.3`
+- added `Docs/ci_honesty_validation_session6.md` with the local validation
+  result and remaining risks
+
+Verification:
+
+- Unity batchmode script compilation completed with `Tundra build success`
+- Unity batchmode `BreachScenarioEngine.Editor.CI.PilotMissionPipelineCi.RunAll`
+  returned exit code `0`
+- the pilot CI runner logged
+  `Pilot mission pipeline passed for all missions.`
+- VS01, VS02, and VS03 generated `PASS` verification summaries and `PASS`
+  generation manifests
+- direct Unity CLI `-runTests -testPlatform EditMode` returned exit code `0`
+  after compilation, but did not emit `EditModeTestResults.xml`; MCP
+  `run_tests` accepted an async EditMode job with explicit `projectRoot`, but
+  the result was not synchronously available in this chat
+
 Exit criteria:
 
 - workflow text matches its actual behavior
@@ -1175,8 +1201,9 @@ Exit criteria:
 
 Recommended handoff note:
 
-- "Please finish by making the CI story honest and running the full validation
-  sequence. If anything is deferred, record the exact blocker."
+- "CI honesty is complete: GitHub Actions is now labeled as a preview
+  placeholder, local pilot mission validation passes for VS01/VS02/VS03, and
+  the remaining blocker is the Unity CLI EditMode XML reporting path."
 
 ### Suggested Chat Split For This Track
 

@@ -18,6 +18,7 @@ Short entry point for the active Breach Scenario Engine MCP documentation.
 | [scene_materialization_contract_v2.3.md](scene_materialization_contract_v2.3.md) | Contract for building Unity scene previews from generated artifacts |
 | [breach_technology_transfer_acceptance_v2.3.md](breach_technology_transfer_acceptance_v2.3.md) | Acceptance gates and risk checklist for migrated BREACH technology |
 | [pilot_operation_checklist.md](pilot_operation_checklist.md) | Pilot operation acceptance checklist for VS01, VS02, and VS03 |
+| [ci_honesty_validation_session6.md](ci_honesty_validation_session6.md) | CI preview decision and local validation record for Post-Transfer Session 6 |
 | [development_plan_sessions.md](development_plan_sessions.md) | Session-split plan for handing the work across chats |
 | [canonical_tools.md](canonical_tools.md) | Current project MCP tool contract |
 | [runtime_tools.md](runtime_tools.md) | Actual tools exposed by the current runtime |

@@ -81,6 +81,9 @@ MCP backlog and generic bridge workflow notes are not part of the active docs.
 - [Docs/breach_technology_transfer_acceptance_v2.3.md](breach_technology_transfer_acceptance_v2.3.md)
   - Acceptance gates, traceability requirements, and migration risks
 
+- [Docs/ci_honesty_validation_session6.md](ci_honesty_validation_session6.md)
+  - CI preview decision and local validation record for Post-Transfer Session 6
+
 ### Planning and history
 
 - [Docs/development_plan_sessions.md](development_plan_sessions.md)
