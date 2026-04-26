@@ -104,7 +104,8 @@ public sealed class DispatcherTests
                 "arguments": {
                   "action": "create_folder",
                   "projectRoot": "{{root.Replace("\\", "\\\\")}}",
-                  "path": "Assets/NewFolder/Sub"
+                  "path": "Assets/NewFolder/Sub",
+                  "waitMs": 0
                 }
               }
             }
@@ -120,7 +121,8 @@ public sealed class DispatcherTests
                 "arguments": {
                   "action": "exists",
                   "projectRoot": "{{root.Replace("\\", "\\\\")}}",
-                  "path": "Assets/NewFolder/Sub"
+                  "path": "Assets/NewFolder/Sub",
+                  "waitMs": 0
                 }
               }
             }
@@ -951,7 +953,8 @@ public sealed class DispatcherTests
             using var doc = JsonDocument.Parse("""
             {
               "params": {
-                "name": "editor.state"
+                "name": "editor.state",
+                "arguments": { "waitMs": 0 }
               }
             }
             """);

@@ -40,21 +40,28 @@ Result:
 EditMode test command attempted:
 
 ```powershell
-& 'C:\Program Files\Unity\Hub\Editor\6000.4.3f1\Editor\Unity.exe' -batchmode -projectPath 'E:\Games\Breach\BreachScenarioEngine' -runTests -testPlatform EditMode -testResults 'E:\Games\Breach\BreachScenarioEngine\Artifacts\Validation\EditModeTestResults.xml' -logFile 'E:\Games\Breach\BreachScenarioEngine\Artifacts\Validation\EditModeTests.log' -quit
+& 'C:\Program Files\Unity\Hub\Editor\6000.4.3f1\Editor\Unity.exe' -batchmode -projectPath 'E:\Games\Breach\BreachScenarioEngine' -runTests -testPlatform EditMode -testResults 'E:\Games\Breach\BreachScenarioEngine\Artifacts\Validation\EditModeTestResults.xml' -logFile 'E:\Games\Breach\BreachScenarioEngine\Artifacts\Validation\EditModeTests.log'
 ```
 
 Observed result:
 
 - Unity batchmode returned exit code `0`.
-- Script compilation completed with `Tundra build success`.
-- No `EditModeTestResults.xml` was emitted by this CLI run.
-- The MCP `run_tests` surface accepted an EditMode job when `projectRoot` was
-  supplied, but the async result was not available synchronously in this chat.
+- `EditModeTestResults.xml` was emitted.
+- Unity EditMode tests passed: `33/33`.
+
+.NET server test command:
+
+```powershell
+dotnet test 'dotnet-prototype\tests\BreachScenarioEngine.Mcp.Server.Tests\BreachScenarioEngine.Mcp.Server.Tests.csproj' --logger "trx;LogFileName=DotnetServerTests.trx" --results-directory 'E:\Games\Breach\BreachScenarioEngine\Artifacts\Validation' --verbosity minimal
+```
+
+Result:
+
+- .NET server tests passed: `93/93`.
 
 ## Remaining Risks
 
 - GitHub Actions is not a real Unity acceptance gate yet.
-- The local Unity CLI `-runTests` path still needs follow-up if XML reporting is
-  required for this exact environment.
-- Current acceptance evidence for this session is compile success plus the
+- Current acceptance evidence for this session is local validation: Unity
+  EditMode `33/33`, .NET server tests `93/93`, and
   `PilotMissionPipelineCi.RunAll` PASS for all three pilot missions.

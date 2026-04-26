@@ -1189,9 +1189,10 @@ Verification:
 - VS01, VS02, and VS03 generated `PASS` verification summaries and `PASS`
   generation manifests
 - direct Unity CLI `-runTests -testPlatform EditMode` returned exit code `0`
-  after compilation, but did not emit `EditModeTestResults.xml`; MCP
-  `run_tests` accepted an async EditMode job with explicit `projectRoot`, but
-  the result was not synchronously available in this chat
+  and emitted `EditModeTestResults.xml` with `33/33` tests passing when Unity
+  was allowed to own process shutdown instead of also receiving `-quit`
+- .NET server tests passed with `93/93` after bridge queue tests explicitly
+  used `waitMs: 0` for no-live-Unity async behavior
 
 Exit criteria:
 
@@ -1202,8 +1203,8 @@ Exit criteria:
 Recommended handoff note:
 
 - "CI honesty is complete: GitHub Actions is now labeled as a preview
-  placeholder, local pilot mission validation passes for VS01/VS02/VS03, and
-  the remaining blocker is the Unity CLI EditMode XML reporting path."
+  placeholder, Unity EditMode tests pass with XML output, .NET server tests
+  pass, and local pilot mission validation passes for VS01/VS02/VS03."
 
 ### Suggested Chat Split For This Track
 
